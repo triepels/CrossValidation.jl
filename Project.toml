@@ -1,0 +1,8 @@
+name = "CrossValidations"
+uuid = "aa7cfe55-ba28-4f66-bd2e-3f277ea08f09"
+authors = ["Ron Triepels"]
+version = "0.1.0"
+
+[deps]
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
