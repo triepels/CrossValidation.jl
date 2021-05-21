@@ -1,4 +1,4 @@
-module CrossValidations
+module CrossValidation
 
 using Base: @propagate_inbounds, Iterators.ProductIterator, product
 using Random: shuffle!

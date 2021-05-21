@@ -1,4 +1,4 @@
-name = "CrossValidations"
+name = "CrossValidation"
 uuid = "aa7cfe55-ba28-4f66-bd2e-3f277ea08f09"
 authors = ["Ron Triepels"]
 version = "0.1.0"
