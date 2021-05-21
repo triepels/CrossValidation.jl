@@ -6,7 +6,7 @@ using Distributed: pmap
 
 export AbstractCVMethod, Holdout, LeavePOut, KFold,
        ExhaustiveSearch,
-       CrossValidation, crossvalidate,
+       ModelValidation, ParameterTuning, crossvalidate,
        predict, score
 
 # Based on Knet's src/data.jl
