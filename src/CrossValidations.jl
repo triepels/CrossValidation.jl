@@ -144,19 +144,46 @@ function Base.iterate(s::ExhaustiveSearch, state)
     return (NamedTuple{s.keys}(next[1]), next[2])
 end
 
-struct CrossValidation{T1,T2}
-    models::Array{T1, 2}
-    scores::Array{T2, 2}
-    final::T1
-end
-
+_fit(data::AbstractArray, fit) = fit(data)
+_fit(data::Union{Tuple, NamedTuple}, fit) = fit(data...)
 _fit(data::AbstractArray, fit, args) = fit(data, args...)
 _fit(data::Union{Tuple, NamedTuple}, fit, args) = fit(data..., args...)
 
 _score(data::AbstractArray, model) = score(model, data)
 _score(data::Union{Tuple, NamedTuple}, model) = score(model, data...)
 
-function crossvalidate(fit::Function, search::ExhaustiveSearch, method::AbstractCVMethod; maximize=true, verbose=false)
+struct ModelValidation{T1,T2}
+    models::Array{T1, 1}
+    scores::Array{T2, 1}
+end
+
+struct ParameterTuning{T1,T2}
+    models::Array{T1, 2}
+    scores::Array{T2, 2}
+    final::T1
+end
+
+function crossvalidate(fit::Function, method::AbstractCVMethod; maximize=true, verbose=false)
+    n = length(method)
+    models = Array{Any, 1}(undef, n)
+    scores = Array{Any, 1}(undef, n)
+
+    i = 1
+    for (train, test) in method
+        if (verbose) @info "Start iteration $i of $n" end
+        models[i] = _fit(train, fit)
+        scores[i] = _score(test, models[i])
+        if i == 1
+            models = convert(Array{typeof(models[1])}, models)
+            scores = convert(Array{typeof(scores[1])}, scores)
+        end
+        i = i + 1
+    end
+
+    return ModelValidation(models, scores)
+end
+
+function crossvalidate(fit::Function, method::AbstractCVMethod, search::ExhaustiveSearch; maximize=true, verbose=false)
     grid = collect(search)
     n, m = length(method), length(grid)
     models = Array{Any, 2}(undef, n, m)
@@ -184,14 +211,14 @@ function crossvalidate(fit::Function, search::ExhaustiveSearch, method::Abstract
     if (verbose) @info "Fitting final model" end
     final = _fit(method.data, fit, grid[index])
 
-    return CrossValidation(models, scores, final)
+    return ParameterTuning(models, scores, final)
 end
 
-function predict(cv::CrossValidation, kwargs...)
+function predict(cv::ParameterTuning, kwargs...)
     return predict(cv.final, kwargs...)
 end
 
-function score(cv::CrossValidation, kwargs...)
+function score(cv::ParameterTuning, kwargs...)
     return score(cv.final, kwargs...)
 end
 

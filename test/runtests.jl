@@ -24,4 +24,8 @@ search = ExhaustiveSearch(a=1:2, b=3:4)
 
 method = Holdout(x, ratio=0.8)
 
-cv = crossvalidate(mymodel, search, method, verbose=true)
+cv = crossvalidate(mymodel, method, search)
+
+cv = crossvalidate((x) -> mymodel(x, 1, 2), method)
+
+cv = crossvalidate((x) -> crossvalidate(mymodel, Holdout(x), search), Holdout(x))
