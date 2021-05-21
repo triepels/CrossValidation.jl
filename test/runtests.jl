@@ -1,5 +1,5 @@
-using CrossValidations
-import CrossValidations: predict, score
+using CrossValidation
+import CrossValidation: predict, score
 
 struct MyModel
     a::Int
