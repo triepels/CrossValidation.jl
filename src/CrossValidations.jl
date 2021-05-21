@@ -150,6 +150,12 @@ struct CrossValidation{T1,T2}
     final::T1
 end
 
+_fit(data::AbstractArray, fit, args) = fit(data, args...)
+_fit(data::Union{Tuple, NamedTuple}, fit, args) = fit(data..., args...)
+
+_score(data::AbstractArray, model) = score(model, data)
+_score(data::Union{Tuple, NamedTuple}, model) = score(model, data...)
+
 function crossvalidate(fit::Function, search::ExhaustiveSearch, method::AbstractCVMethod; maximize=true, verbose=false)
     grid = collect(search)
     n, m = length(method), length(grid)
@@ -159,8 +165,8 @@ function crossvalidate(fit::Function, search::ExhaustiveSearch, method::Abstract
     i = 1
     for (train, test) in method
         if (verbose) @info "Start iteration $i of $n" end
-        models[i,:] = pmap((args) -> fit(train..., args...), grid)
-        scores[i,:] = map((model) -> score(model, test...), models[i,:])
+        models[i,:] = pmap((args) -> _fit(train, fit, args), grid)
+        scores[i,:] = map((model) -> _score(test, model), models[i,:])
         if i == 1
             models = convert(Array{typeof(models[1])}, models)
             scores = convert(Array{typeof(scores[1])}, scores)
@@ -176,7 +182,7 @@ function crossvalidate(fit::Function, search::ExhaustiveSearch, method::Abstract
     end
 
     if (verbose) @info "Fitting final model" end
-    final = fit(method.data..., grid[index]...)
+    final = _fit(method.data, fit, grid[index])
 
     return CrossValidation(models, scores, final)
 end
