@@ -47,8 +47,8 @@ Base.eltype(m::Holdout{D}) where D = Tuple{D, D}
     indices = shuffle!([1:m.nobs;])
     k = ceil(Int, m.ratio * m.nobs)
     train = _getobs(m.data, indices[1:k])
-    val = _getobs(m.data, indices[(k + 1):end])
-    return ((train, val), state + 1)
+    test = _getobs(m.data, indices[(k + 1):end])
+    return ((train, test), state + 1)
 end
 
 struct LeavePOut{D} <: AbstractCVMethod
@@ -75,8 +75,8 @@ Base.eltype(m::LeavePOut{D}) where D = Tuple{D, D}
     end
     fold = ((state - 1) * m.p + 1):(state * m.p)
     train = _getobs(m.data, m.indices[1:end .∉ Ref(fold)])
-    val = _getobs(m.data, m.indices[fold])
-    return ((train, val), state + 1)
+    test = _getobs(m.data, m.indices[fold])
+    return ((train, test), state + 1)
 end
 
 struct KFold{D} <: AbstractCVMethod
@@ -105,8 +105,8 @@ Base.eltype(m::KFold{D}) where D = Tuple{D, D}
         p = p + 1
     end
     train = _getobs(m.data, m.indices[(p + 1):end])
-    val = _getobs(m.data, m.indices[1:p])
-    return ((train, val), (2, p))
+    test = _getobs(m.data, m.indices[1:p])
+    return ((train, test), (2, p))
 end
 
 @propagate_inbounds function Base.iterate(m::KFold, state)
@@ -117,8 +117,8 @@ end
     end
     fold = (state[2] + 1):(state[2] + p)
     train = _getobs(m.data, m.indices[1:end .∉ Ref(fold)])
-    val = _getobs(m.data, m.indices[fold])
-    return ((train, val), (state[1] + 1, state[2] + p))
+    test = _getobs(m.data, m.indices[fold])
+    return ((train, test), (state[1] + 1, state[2] + p))
 end
 
 struct ExhaustiveSearch
@@ -157,10 +157,10 @@ function crossvalidate(fit::Function, search::ExhaustiveSearch, method::Abstract
     scores = Array{Any, 2}(undef, n, m)
 
     i = 1
-    for (train, val) in method
+    for (train, test) in method
         if (verbose) @info "Start iteration $i of $n" end
         models[i,:] = pmap((args) -> fit(train..., args...), grid)
-        scores[i,:] = map((model) -> score(model, val...), models[i,:])
+        scores[i,:] = map((model) -> score(model, test...), models[i,:])
         if i == 1
             models = convert(Array{typeof(models[1])}, models)
             scores = convert(Array{typeof(scores[1])}, scores)
