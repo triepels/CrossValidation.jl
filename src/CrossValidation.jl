@@ -22,7 +22,7 @@ function _nobs(data::Union{Tuple, NamedTuple})
 end
 
 # Based on Knet's src/data.jl
-_getobs(x::AbstractArray, i) = @view x[ntuple(i -> Colon(), Val(ndims(x) - 1))..., i]
+_getobs(x::AbstractArray, i) = x[ntuple(i -> Colon(), Val(ndims(x) - 1))..., i]
 _getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(_getobs, i), x)
 
 abstract type AbstractCVMethod end
@@ -152,12 +152,12 @@ _fit(data::Union{Tuple, NamedTuple}, fit, args) = fit(data..., args...)
 _score(data::AbstractArray, model) = score(model, data)
 _score(data::Union{Tuple, NamedTuple}, model) = score(model, data...)
 
-struct ModelValidation{T1,T2 <: Real}
+struct ModelValidation{T1,T2}
     models::Array{T1, 1}
     scores::Array{T2, 1}
 end
 
-struct ParameterSearch{T1,T2 <: Real}
+struct ParameterSearch{T1,T2}
     models::Array{T1, 2}
     scores::Array{T2, 2}
     final::T1
