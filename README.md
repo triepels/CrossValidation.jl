@@ -121,7 +121,7 @@ end
 ```
 ```julia
 function score(model::MyModel, x::AbstractArray)
-    # Code to score the performance of a model here...
+    # Code to score the performance of the model here...
 end
 ```
 
