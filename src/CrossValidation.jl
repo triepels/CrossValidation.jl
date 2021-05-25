@@ -22,7 +22,7 @@ function _nobs(data::Union{Tuple, NamedTuple})
 end
 
 # Based on Knet's src/data.jl
-_getobs(x::AbstractArray, i) = x[ntuple(i -> Colon(), Val(ndims(x) - 1))..., i]
+_getobs(x::AbstractArray, i) = @view x[ntuple(i -> Colon(), Val(ndims(x) - 1))..., i]
 _getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(_getobs, i), x)
 
 abstract type AbstractCVMethod end
@@ -211,14 +211,14 @@ function crossvalidate(fit::Function, method::AbstractCVMethod, search::Exhausti
     if (verbose) @info "Fitting final model" end
     final = _fit(method.data, fit, grid[index])
 
-    return ParameterTuning(models, scores, final)
+    return ParameterSearch(models, scores, final)
 end
 
-function predict(cv::ParameterTuning, kwargs...)
+function predict(cv::ParameterSearch, kwargs...)
     return predict(cv.final, kwargs...)
 end
 
-function score(cv::ParameterTuning, kwargs...)
+function score(cv::ParameterSearch, kwargs...)
     return score(cv.final, kwargs...)
 end
 
