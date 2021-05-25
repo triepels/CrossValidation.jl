@@ -145,7 +145,7 @@ The result of the validation is an object of type `ModelValidation` with two dat
 * `scores`: an array holding the scores of the models as estimated by the `score` function. The array has a size of `n` x 1, where `n` is the number of folds.
 
 ## Nested Cross-Validation
-In some cases, a model needs to be validated on some data, but the model has some hyperparameters that need to be tuned for each fold as well. This can be done by nested cross-validation. Performing nested cross-validation using the `CrossValidation.jl` package is straightforward. Let us perform nested cross-validation on `MyClassifier` as defined in the previous examples. First, we define a grid of parameters that we want to try out in the inner loop:
+In some cases, a model needs to be validated on some data, but the model has some hyperparameters that need to be tuned for each fold as well. This can be done by nested cross-validation. Performing nested cross-validation using the `CrossValidation.jl` package is straightforward. Let us perform nested cross-validation for `MyClassifier` as defined in the previous example. First, we define a grid of parameters that we want to try out in the inner loop:
 
 ```julia
 search = ExhaustiveSearch(a=1:2, b=3:4)
