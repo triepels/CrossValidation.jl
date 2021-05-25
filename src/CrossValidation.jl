@@ -11,7 +11,7 @@ export AbstractCVMethod, Holdout, LeavePOut, KFold,
 
 # Based on Knet's src/data.jl
 _nobs(data::AbstractArray) = size(data)[end]
-# Based on Knet's src/data.jl
+
 function _nobs(data::Union{Tuple, NamedTuple})
     length(data) > 0 || throw(ArgumentError("Need at least one data input"))
     n = _nobs(data[1])
