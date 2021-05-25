@@ -71,7 +71,7 @@ Accordingly, we need to specify the resampling method and corresponding data tha
 method = KFold((x, y), k=5)
 ```
 
-Here, `x` is an array with training data and `y` an array with the corresponding training labels. Finally, we start the hyperparameter tuning by:
+Here, `x` is an array with training data and `y` an array with the corresponding training labels. Finally, we start the hyperparameter search by:
 
 ```julia
 cv = crossvalidate(mymodel, search, method)
