@@ -100,7 +100,7 @@ Base.eltype(m::KFold{D}) where D = Tuple{D, D}
     if m.shuffle
         shuffle!(m.indices)
     end
-    p = floor(Int, m.nobs/m.k)
+    p = floor(Int, m.nobs / m.k)
     if mod(m.nobs, m.k) ≥ 1
         p = p + 1
     end
