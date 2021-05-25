@@ -158,5 +158,5 @@ crossvalidate(crossvalidate(myclassifier, HoldOut((x, y)), search), KFold((x, y)
 ```
 
 Here, we use holdout validation for the inner loop and k-fold cross-validation for the outer loop. The result of the nested cross-validation is an object of type `ModelValidation` with two data members:
-* `models`: an array of `ParameterSearch` objects that are created for the inner loop of the nested cross-validation.
+* `models`: an array of `ParameterSearch` objects that are created by the inner loop of the nested cross-validation.
 * `scores`: an array holding the scores of the best performing models of each parameter search as estimated by the `score` function. The array has a size of `n` x 1, where `n` is the number of folds.
