@@ -152,12 +152,12 @@ _fit(data::Union{Tuple, NamedTuple}, fit, args) = fit(data..., args...)
 _score(data::AbstractArray, model) = score(model, data)
 _score(data::Union{Tuple, NamedTuple}, model) = score(model, data...)
 
-struct ModelValidation{T1,T2}
+struct ModelValidation{T1,T2 <: Real}
     models::Array{T1, 1}
     scores::Array{T2, 1}
 end
 
-struct ParameterTuning{T1,T2}
+struct ParameterSearch{T1,T2 <: Real}
     models::Array{T1, 2}
     scores::Array{T2, 2}
     final::T1
@@ -170,7 +170,7 @@ function crossvalidate(fit::Function, method::AbstractCVMethod; maximize=true, v
 
     i = 1
     for (train, test) in method
-        if (verbose) @info "Start iteration $i of $n" end
+        if (verbose) @info "Iteration $i of $n" end
         models[i] = _fit(train, fit)
         scores[i] = _score(test, models[i])
         if i == 1
@@ -191,7 +191,7 @@ function crossvalidate(fit::Function, method::AbstractCVMethod, search::Exhausti
 
     i = 1
     for (train, test) in method
-        if (verbose) @info "Start iteration $i of $n" end
+        if (verbose) @info "Iteration $i of $n" end
         models[i,:] = pmap((args) -> _fit(train, fit, args), grid)
         scores[i,:] = map((model) -> _score(test, model), models[i,:])
         if i == 1
