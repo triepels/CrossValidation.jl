@@ -154,7 +154,7 @@ search = ExhaustiveSearch(a=1:2, b=3:4)
 Accordingly, we start the nested cross-validation by:
 
 ```julia
-crossvalidate(crossvalidate(myclassifier, HoldOut((x, y)), search), KFold((x, y)))
+crossvalidate((x, y) -> crossvalidate(myclassifier, HoldOut((x, y)), search), KFold((x, y)))
 ```
 
 Here, we use holdout validation for the inner loop and k-fold cross-validation for the outer loop. The result of the nested cross-validation is an object of type `ModelValidation` with two data members:
