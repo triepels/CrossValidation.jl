@@ -8,9 +8,10 @@ Validation schemes:
 * Nested cross-validation
 
 Resample methods:
-* Holdout
-* LeavePOut
-* KFold
+* Fixed split
+* Random split (holdout)
+* Leave-P-Out
+* K-Fold
 
 Search methods:
 * Exhaustive search
@@ -154,9 +155,9 @@ search = ExhaustiveSearch(a=1:2, b=3:4)
 Accordingly, we start the nested cross-validation by:
 
 ```julia
-crossvalidate((x, y) -> crossvalidate(myclassifier, HoldOut((x, y)), search), KFold((x, y)))
+crossvalidate((x, y) -> crossvalidate(myclassifier, RandomSplit((x, y)), search), KFold((x, y)))
 ```
 
-Here, we use holdout validation for the inner loop and k-fold cross-validation for the outer loop. The result of the nested cross-validation is an object of type `ModelValidation` with two data members:
+Here, we use random split (holdout) validation for the inner loop and k-fold cross-validation for the outer loop. The result of the nested cross-validation is an object of type `ModelValidation` with two data members:
 * `models`: an array of `ParameterSearch` objects that are created by the inner loop of the nested cross-validation.
 * `scores`: an array holding the scores of the best performing models of each parameter search as estimated by the `score` function. The array has a size of `n` x 1, where `n` is the number of folds.

@@ -4,7 +4,7 @@ using Base: @propagate_inbounds, Iterators.ProductIterator, product
 using Random: shuffle!
 using Distributed: pmap
 
-export AbstractCVMethod, Holdout, LeavePOut, KFold,
+export AbstractCVMethod, FixedSplit, RandomSplit, LeavePOut, KFold,
        ExhaustiveSearch,
        ModelValidation, ParameterTuning, crossvalidate,
        predict, score
@@ -41,7 +41,7 @@ end
 Base.length(m::FixedSplit) = 1
 Base.eltype(m::FixedSplit{D}) where D = Tuple{D, D}
 
-function Base.iterate(m::FixedSplit, state=1)
+@propagate_inbounds function Base.iterate(m::FixedSplit, state=1)
     state > 1 && return nothing
     k = ceil(Int, m.ratio * m.nobs)
     train = _getobs(m.data, 1:k)
@@ -49,22 +49,22 @@ function Base.iterate(m::FixedSplit, state=1)
     return ((train, test), state + 1)
 end
 
-struct Holdout{D} <: AbstractCVMethod
+struct RandomSplit{D} <: AbstractCVMethod
     data::D
     nobs::Int
     ratio::Number
     times::Int
 end
 
-function Holdout(data; ratio=0.8, times=1)
+function RandomSplit(data; ratio=0.8, times=1)
     0 < ratio < 1 || throw(ArgumentError("ratio should be between zero and one"))
-    return Holdout(data, _nobs(data), ratio, times)
+    return RandomSplit(data, _nobs(data), ratio, times)
 end
 
-Base.length(m::Holdout) = m.times
-Base.eltype(m::Holdout{D}) where D = Tuple{D, D}
+Base.length(m::RandomSplit) = m.times
+Base.eltype(m::RandomSplit{D}) where D = Tuple{D, D}
 
-@propagate_inbounds function Base.iterate(m::Holdout, state=1)
+@propagate_inbounds function Base.iterate(m::RandomSplit, state=1)
     state > m.times && return nothing
     indices = shuffle!([1:m.nobs;])
     k = ceil(Int, m.ratio * m.nobs)
