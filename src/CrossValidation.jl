@@ -185,13 +185,13 @@ struct ParameterSearch{T1,T2}
     final::T1
 end
 
-function crossvalidate(fit::Function, method::ResampleMethod; maximize=true, verbose=false)
-    n = length(method)
+function crossvalidate(fit::Function, resample::ResampleMethod; maximize=true, verbose=false)
+    n = length(resample)
     models = Array{Any, 1}(undef, n)
     scores = Array{Any, 1}(undef, n)
 
     i = 1
-    for (train, test) in method
+    for (train, test) in resample
         if (verbose) @info "Iteration $i of $n" end
         models[i] = _fit(train, fit)
         scores[i] = _score(test, models[i])
@@ -205,14 +205,14 @@ function crossvalidate(fit::Function, method::ResampleMethod; maximize=true, ver
     return ModelValidation(models, scores)
 end
 
-function crossvalidate(fit::Function, method::ResampleMethod, search::ExhaustiveSearch; maximize=true, verbose=false)
+function crossvalidate(fit::Function, resample::ResampleMethod, search::ExhaustiveSearch; maximize=true, verbose=false)
     grid = collect(search)
-    n, m = length(method), length(grid)
+    n, m = length(resample), length(grid)
     models = Array{Any, 2}(undef, n, m)
     scores = Array{Any, 2}(undef, n, m)
 
     i = 1
-    for (train, test) in method
+    for (train, test) in resample
         if (verbose) @info "Iteration $i of $n" end
         models[i,:] = pmap((args) -> _fit(train, fit, args), grid)
         scores[i,:] = map((model) -> _score(test, model), models[i,:])
@@ -231,7 +231,7 @@ function crossvalidate(fit::Function, method::ResampleMethod, search::Exhaustive
     end
 
     if (verbose) @info "Fitting final model" end
-    final = _fit(method.data, fit, grid[index])
+    final = _fit(resample.data, fit, grid[index])
 
     return ParameterSearch(models, scores, final)
 end

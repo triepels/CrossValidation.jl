@@ -69,13 +69,13 @@ search = ExhaustiveSearch(a=1:2, b=3:4)
 Accordingly, we need to specify the resampling method and corresponding data that is used for the search. We will use k-fold cross-validation with five folds:
 
 ```julia
-method = KFold((x, y), k=5)
+resample = KFold((x, y), k=5)
 ```
 
 Here, `x` is an array with training data and `y` an array with the corresponding training labels. Finally, we start the hyperparameter search by:
 
 ```julia
-cv = crossvalidate(mymodel, search, method)
+cv = crossvalidate(mymodel, resample, search)
 ```
 
 The result of the search is an object of type `ParameterSearch` with three data members: 
@@ -132,13 +132,13 @@ We can now use the `CrossValidation.jl` package similarly as in the supervised l
 It might be of interest to validate how well `MyModel` performs out of sample. We do this by performing model validation. The `CrossValidation.jl` allows performing model validation based on various resampling methods. Let us use leave-p-out with `p` set to 100:
 
 ```julia
-method = LeavePOut(x, p=100)
+resample = LeavePOut(x, p=100)
 ```
 
 We start the model validation by:
 
 ```julia
-crossvalidate(mymodel, method)
+crossvalidate(mymodel, resample)
 ```
 
 The result of the validation is an object of type `ModelValidation` with two data members:
