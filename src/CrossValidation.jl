@@ -27,6 +27,28 @@ _getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(_getobs, i), x)
 
 abstract type AbstractCVMethod end
 
+struct FixedSplit{D} <: AbstractCVMethod
+    data::D
+    nobs::Int
+    ratio::Number
+end
+
+function FixedSplit(data; ratio=0.8)
+    0 < ratio < 1 || throw(ArgumentError("ratio should be between zero and one"))
+    return FixedSplit(data, _nobs(data), ratio)
+end
+
+Base.length(m::FixedSplit) = 1
+Base.eltype(m::FixedSplit{D}) where D = Tuple{D, D}
+
+function Base.iterate(m::FixedSplit, state=1)
+    state > 1 && return nothing
+    k = ceil(Int, m.ratio * m.nobs)
+    train = _getobs(m.data, 1:k)
+    test = _getobs(m.data, (k + 1):m.nobs)
+    return ((train, test), state + 1)
+end
+
 struct Holdout{D} <: AbstractCVMethod
     data::D
     nobs::Int
