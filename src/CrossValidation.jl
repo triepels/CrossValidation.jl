@@ -38,14 +38,14 @@ function FixedSplit(data; ratio=0.8)
     return FixedSplit(data, _nobs(data), ratio)
 end
 
-Base.length(m::FixedSplit) = 1
-Base.eltype(m::FixedSplit{D}) where D = Tuple{D, D}
+Base.length(r::FixedSplit) = 1
+Base.eltype(r::FixedSplit{D}) where D = Tuple{D, D}
 
-@propagate_inbounds function Base.iterate(m::FixedSplit, state=1)
+@propagate_inbounds function Base.iterate(r::FixedSplit, state=1)
     state > 1 && return nothing
-    k = ceil(Int, m.ratio * m.nobs)
-    train = _getobs(m.data, 1:k)
-    test = _getobs(m.data, (k + 1):m.nobs)
+    k = ceil(Int, r.ratio * r.nobs)
+    train = _getobs(r.data, 1:k)
+    test = _getobs(r.data, (k + 1):r.nobs)
     return ((train, test), state + 1)
 end
 
@@ -61,15 +61,15 @@ function RandomSplit(data; ratio=0.8, times=1)
     return RandomSplit(data, _nobs(data), ratio, times)
 end
 
-Base.length(m::RandomSplit) = m.times
-Base.eltype(m::RandomSplit{D}) where D = Tuple{D, D}
+Base.length(r::RandomSplit) = r.times
+Base.eltype(r::RandomSplit{D}) where D = Tuple{D, D}
 
-@propagate_inbounds function Base.iterate(m::RandomSplit, state=1)
-    state > m.times && return nothing
-    indices = shuffle!([1:m.nobs;])
-    k = ceil(Int, m.ratio * m.nobs)
-    train = _getobs(m.data, indices[1:k])
-    test = _getobs(m.data, indices[(k + 1):end])
+@propagate_inbounds function Base.iterate(r::RandomSplit, state=1)
+    state > r.times && return nothing
+    indices = shuffle!([1:r.nobs;])
+    k = ceil(Int, r.ratio * r.nobs)
+    train = _getobs(r.data, indices[1:k])
+    test = _getobs(r.data, indices[(k + 1):end])
     return ((train, test), state + 1)
 end
 
@@ -87,17 +87,17 @@ function LeavePOut(data; p=1, shuffle=true)
     return LeavePOut(data, n, p, [1:n;], shuffle)
 end
 
-Base.length(m::LeavePOut) = floor(Int, m.nobs / m.p)
-Base.eltype(m::LeavePOut{D}) where D = Tuple{D, D}
+Base.length(r::LeavePOut) = floor(Int, r.nobs / r.p)
+Base.eltype(r::LeavePOut{D}) where D = Tuple{D, D}
 
-@propagate_inbounds function Base.iterate(m::LeavePOut, state=1)
-    state > length(m) && return nothing
-    if m.shuffle && state == 1
-        shuffle!(m.indices)
+@propagate_inbounds function Base.iterate(r::LeavePOut, state=1)
+    state > length(r) && return nothing
+    if r.shuffle && state == 1
+        shuffle!(r.indices)
     end
-    fold = ((state - 1) * m.p + 1):(state * m.p)
-    train = _getobs(m.data, m.indices[1:end .∉ Ref(fold)])
-    test = _getobs(m.data, m.indices[fold])
+    fold = ((state - 1) * r.p + 1):(state * r.p)
+    train = _getobs(r.data, r.indices[1:end .∉ Ref(fold)])
+    test = _getobs(r.data, r.indices[fold])
     return ((train, test), state + 1)
 end
 
@@ -115,31 +115,31 @@ function KFold(data; k=10, shuffle=true)
     return KFold(data, n, k, [1:n;], shuffle)
 end
 
-Base.length(m::KFold) = m.k
-Base.eltype(m::KFold{D}) where D = Tuple{D, D}
+Base.length(r::KFold) = r.k
+Base.eltype(r::KFold{D}) where D = Tuple{D, D}
 
-@propagate_inbounds function Base.iterate(m::KFold)
-    if m.shuffle
-        shuffle!(m.indices)
+@propagate_inbounds function Base.iterate(r::KFold)
+    if r.shuffle
+        shuffle!(r.indices)
     end
-    p = floor(Int, m.nobs / m.k)
-    if mod(m.nobs, m.k) ≥ 1
+    p = floor(Int, r.nobs / r.k)
+    if mod(r.nobs, r.k) ≥ 1
         p = p + 1
     end
-    train = _getobs(m.data, m.indices[(p + 1):end])
-    test = _getobs(m.data, m.indices[1:p])
+    train = _getobs(r.data, r.indices[(p + 1):end])
+    test = _getobs(r.data, r.indices[1:p])
     return ((train, test), (2, p))
 end
 
-@propagate_inbounds function Base.iterate(m::KFold, state)
-    state[1] > m.k && return nothing
-    p = floor(Int, m.nobs / m.k)
-    if mod(m.nobs, m.k) ≥ state[1]
+@propagate_inbounds function Base.iterate(r::KFold, state)
+    state[1] > r.k && return nothing
+    p = floor(Int, r.nobs / r.k)
+    if mod(r.nobs, r.k) ≥ state[1]
         p = p + 1
     end
     fold = (state[2] + 1):(state[2] + p)
-    train = _getobs(m.data, m.indices[1:end .∉ Ref(fold)])
-    test = _getobs(m.data, m.indices[fold])
+    train = _getobs(r.data, r.indices[1:end .∉ Ref(fold)])
+    test = _getobs(r.data, r.indices[fold])
     return ((train, test), (state[1] + 1, state[2] + p))
 end
 
