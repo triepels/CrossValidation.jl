@@ -4,7 +4,7 @@ using Base: @propagate_inbounds, Iterators.ProductIterator, product
 using Random: shuffle!
 using Distributed: pmap
 
-export AbstractCVMethod, FixedSplit, RandomSplit, LeavePOut, KFold,
+export ResampleMethod, FixedSplit, RandomSplit, LeavePOut, KFold,
        ExhaustiveSearch,
        ModelValidation, ParameterTuning, crossvalidate,
        predict, score
@@ -25,9 +25,9 @@ end
 _getobs(x::AbstractArray, i) = x[ntuple(i -> Colon(), Val(ndims(x) - 1))..., i]
 _getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(_getobs, i), x)
 
-abstract type AbstractCVMethod end
+abstract type ResampleMethod end
 
-struct FixedSplit{D} <: AbstractCVMethod
+struct FixedSplit{D} <: ResampleMethod
     data::D
     nobs::Int
     ratio::Number
@@ -49,7 +49,7 @@ Base.eltype(m::FixedSplit{D}) where D = Tuple{D, D}
     return ((train, test), state + 1)
 end
 
-struct RandomSplit{D} <: AbstractCVMethod
+struct RandomSplit{D} <: ResampleMethod
     data::D
     nobs::Int
     ratio::Number
@@ -73,7 +73,7 @@ Base.eltype(m::RandomSplit{D}) where D = Tuple{D, D}
     return ((train, test), state + 1)
 end
 
-struct LeavePOut{D} <: AbstractCVMethod
+struct LeavePOut{D} <: ResampleMethod
     data::D
     nobs::Int
     p::Int
@@ -101,7 +101,7 @@ Base.eltype(m::LeavePOut{D}) where D = Tuple{D, D}
     return ((train, test), state + 1)
 end
 
-struct KFold{D} <: AbstractCVMethod
+struct KFold{D} <: ResampleMethod
     data::D
     nobs::Int
     k::Int
@@ -185,7 +185,7 @@ struct ParameterSearch{T1,T2}
     final::T1
 end
 
-function crossvalidate(fit::Function, method::AbstractCVMethod; maximize=true, verbose=false)
+function crossvalidate(fit::Function, method::ResampleMethod; maximize=true, verbose=false)
     n = length(method)
     models = Array{Any, 1}(undef, n)
     scores = Array{Any, 1}(undef, n)
@@ -205,7 +205,7 @@ function crossvalidate(fit::Function, method::AbstractCVMethod; maximize=true, v
     return ModelValidation(models, scores)
 end
 
-function crossvalidate(fit::Function, method::AbstractCVMethod, search::ExhaustiveSearch; maximize=true, verbose=false)
+function crossvalidate(fit::Function, method::ResampleMethod, search::ExhaustiveSearch; maximize=true, verbose=false)
     grid = collect(search)
     n, m = length(method), length(grid)
     models = Array{Any, 2}(undef, n, m)
