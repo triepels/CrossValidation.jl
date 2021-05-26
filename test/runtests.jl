@@ -22,10 +22,8 @@ x = rand(2, 10)
 
 search = ExhaustiveSearch(a=1:2, b=3:4)
 
-resample = RandomSplit(x, ratio=0.8)
+cv = crossvalidate(mymodel, KFold(x), search)
 
-cv = crossvalidate(mymodel, resample, search)
-
-cv = crossvalidate((x) -> mymodel(x, 1, 2), resample)
+cv = crossvalidate((x) -> mymodel(x, 1, 2), LeavePOut(x))
 
 cv = crossvalidate((x) -> crossvalidate(mymodel, FixedSplit(x), search), RandomSplit(x))
