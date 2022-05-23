@@ -185,7 +185,7 @@ struct ParameterSearch{T1,T2}
     final::T1
 end
 
-function crossvalidate(fit::Function, resample::ResampleMethod; maximize=true, verbose=false)
+function crossvalidate(fit::Function, resample::ResampleMethod; verbose=false)
     n = length(resample)
     models = Array{Any, 1}(undef, n)
     scores = Array{Any, 1}(undef, n)
