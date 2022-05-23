@@ -185,6 +185,7 @@ struct ParameterSearch{T1,T2}
     final::T1
 end
 
+nopreprocess(train) = train
 nopreprocess(train, test) = train, test
 
 function crossvalidate(fit::Function, resample::ResampleMethod; preprocess=nopreprocess, verbose=false)
@@ -235,7 +236,7 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
     end
 
     if (verbose) @info "Fitting final model" end
-    final = _fit(resample.data, fit, grid[index])
+    final = _fit(preprocess(resample.data), fit, grid[index])
 
     return ParameterSearch(models, scores, final)
 end
