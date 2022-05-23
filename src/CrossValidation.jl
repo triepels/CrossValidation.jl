@@ -169,8 +169,8 @@ end
 
 _fit(data::AbstractArray, fit) = fit(data)
 _fit(data::Union{Tuple, NamedTuple}, fit) = fit(data...)
-_fit(data::AbstractArray, fit, args) = fit(data, args...)
-_fit(data::Union{Tuple, NamedTuple}, fit, args) = fit(data..., args...)
+_fit(data::AbstractArray, fit, args) = fit(data; args...)
+_fit(data::Union{Tuple, NamedTuple}, fit, args) = fit(data...; args...)
 
 _score(data::AbstractArray, model) = score(model, data)
 _score(data::Union{Tuple, NamedTuple}, model) = score(model, data...)
