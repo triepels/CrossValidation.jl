@@ -1,6 +1,7 @@
 module CrossValidation
 
 using Base: @propagate_inbounds, Iterators.ProductIterator, product
+using Printf: @sprintf
 using Random: shuffle!
 using Distributed: pmap
 
@@ -195,14 +196,20 @@ function crossvalidate(fit::Function, resample::ResampleMethod; preprocess=nopre
 
     i = 1
     for (train, test) in resample
-        if (verbose) @info "Iteration $i of $n" end
         train, test = preprocess(train, test)
+
         models[i] = _fit(train, fit)
         scores[i] = _score(test, models[i])
+
         if i == 1
             models = convert(Array{typeof(models[1])}, models)
             scores = convert(Array{typeof(scores[1])}, scores)
         end
+
+        if verbose
+            @info "Completed iteration $i of $n (score: $(@sprintf("%.4f", scores[i]))"
+        end
+
         i = i + 1
     end
 
@@ -217,26 +224,36 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
 
     i = 1
     for (train, test) in resample
-        if (verbose) @info "Iteration $i of $n" end
         train, test = preprocess(train, test)
+
         models[i,:] = pmap((args) -> _fit(train, fit, args), grid)
         scores[i,:] = map((model) -> _score(test, model), models[i,:])
+
         if i == 1
             models = convert(Array{typeof(models[1])}, models)
             scores = convert(Array{typeof(scores[1])}, scores)
         end
+
+        if verbose
+            if minimize
+                best = min(scores[i,:])
+            else
+                best = max(scores[i,:])
+            end
+            @info "Completed iteration $i of $n (best score: $(@sprintf("%.4f", best)))"
+        end
+
         i = i + 1
     end
 
-    index = 1
     if minimize
-        index = argmin(sum(scores, dims=1) ./ n)[2]
+        idx = argmin(sum(scores, dims=1) ./ n)[2]
     else
-        index = argmax(sum(scores, dims=1) ./ n)[2]
+        idx = argmax(sum(scores, dims=1) ./ n)[2]
     end
 
     if (verbose) @info "Fitting final model" end
-    final = _fit(preprocess(resample.data), fit, grid[index])
+    final = _fit(preprocess(resample.data), fit, grid[idx])
 
     return ParameterSearch(models, scores, final)
 end
