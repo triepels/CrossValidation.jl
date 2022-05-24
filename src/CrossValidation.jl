@@ -216,7 +216,7 @@ function crossvalidate(fit::Function, resample::ResampleMethod; preprocess=nopre
     return ModelValidation(models, scores)
 end
 
-function crossvalidate(fit::Function, resample::ResampleMethod, search::ExhaustiveSearch; preprocess=nopreprocess, minimize=true, verbose=false)
+function crossvalidate(fit::Function, resample::ResampleMethod, search::ExhaustiveSearch; preprocess=nopreprocess, maximize=true, verbose=false)
     grid = collect(search)
     n, m = length(resample), length(grid)
     models = Array{Any, 2}(undef, n, m)
@@ -235,10 +235,10 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
         end
 
         if verbose
-            if minimize
-                best = min(scores[i,:])
+            if maximize
+                best = max(scores[i,:]...)
             else
-                best = max(scores[i,:])
+                best = min(scores[i,:]...)
             end
             @info "Completed iteration $i of $n (best score: $(@sprintf("%.4f", best)))"
         end
@@ -246,10 +246,10 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
         i = i + 1
     end
 
-    if minimize
-        idx = argmin(sum(scores, dims=1) ./ n)[2]
-    else
+    if maximize
         idx = argmax(sum(scores, dims=1) ./ n)[2]
+    else
+        idx = argmin(sum(scores, dims=1) ./ n)[2]
     end
 
     if (verbose) @info "Fitting final model" end
