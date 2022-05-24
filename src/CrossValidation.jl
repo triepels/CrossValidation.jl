@@ -252,8 +252,11 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
         idx = argmin(sum(scores, dims=1) ./ n)[2]
     end
 
-    if (verbose) @info "Fitting final model" end
     final = _fit(preprocess(resample.data), fit, grid[idx])
+
+    if verbose
+        @info "Completed fitting final model"
+    end
 
     return ParameterSearch(models, scores, final)
 end
