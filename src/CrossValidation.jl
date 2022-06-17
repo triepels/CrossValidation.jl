@@ -148,13 +148,13 @@ _score(x::AbstractArray, model) = score(model, x)
 _score(x::Union{Tuple, NamedTuple}, model) = score(model, x...)
 
 struct ModelValidation{T1,T2}
-    models::Array{T1, 1}
-    scores::Array{T2, 1}
+    model::Array{T1, 1}
+    score::Array{T2, 1}
 end
 
 struct ParameterSearch{T1,T2}
-    models::Array{T1, 2}
-    scores::Array{T2, 2}
+    model::Array{T1, 2}
+    score::Array{T2, 2}
     final::T1
 end
 
@@ -163,19 +163,19 @@ nopreprocess(train, test) = train, test
 
 function crossvalidate(fit::Function, resample::ResampleMethod; preprocess::Function = nopreprocess, verbose::Bool = false)
     n = length(resample)
-    models = Array{Any, 1}(undef, n)
-    scores = Array{Any, 1}(undef, n)
+    model = Array{Any, 1}(undef, n)
+    score = Array{Any, 1}(undef, n)
 
     i = 1
     for (train, test) in resample
         train, test = preprocess(train, test)
 
-        models[i] = _fit(train, fit)
-        scores[i] = _score(test, models[i])
+        model[i] = _fit(train, fit)
+        score[i] = _score(test, model[i])
 
         if i == 1
-            models = convert(Array{typeof(models[1])}, models)
-            scores = convert(Array{typeof(scores[1])}, scores)
+            model = convert(Array{typeof(model[1])}, model)
+            score = convert(Array{typeof(score[1])}, score)
         end
 
         if verbose
@@ -185,32 +185,32 @@ function crossvalidate(fit::Function, resample::ResampleMethod; preprocess::Func
         i = i + 1
     end
 
-    return ModelValidation(models, scores)
+    return ModelValidation(model, score)
 end
 
 function crossvalidate(fit::Function, resample::ResampleMethod, search::ExhaustiveSearch; preprocess::Function = nopreprocess, maximize::Bool = true, verbose::Bool = false)
     grid = collect(search)
     n, m = length(resample), length(grid)
-    models = Array{Any, 2}(undef, n, m)
-    scores = Array{Any, 2}(undef, n, m)
+    model = Array{Any, 2}(undef, n, m)
+    score = Array{Any, 2}(undef, n, m)
 
     i = 1
     for (train, test) in resample
         train, test = preprocess(train, test)
 
-        models[i,:] = pmap((args) -> _fit(train, fit, args), grid)
-        scores[i,:] = map((model) -> _score(test, model), models[i,:])
+        model[i,:] = pmap((args) -> _fit(train, fit, args), grid)
+        score[i,:] = map((model) -> _score(test, model), model[i,:])
 
         if i == 1
-            models = convert(Array{typeof(models[1])}, models)
-            scores = convert(Array{typeof(scores[1])}, scores)
+            model = convert(Array{typeof(model[1])}, model)
+            score = convert(Array{typeof(score[1])}, score)
         end
 
         if verbose
             if maximize
-                best = max(scores[i,:]...)
+                best = max(score[i,:]...)
             else
-                best = min(scores[i,:]...)
+                best = min(score[i,:]...)
             end
             @info "Completed iteration $i of $n"
         end
@@ -219,9 +219,9 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
     end
 
     if maximize
-        idx = argmax(sum(scores, dims=1) ./ n)[2]
+        idx = argmax(sum(score, dims=1) ./ n)[2]
     else
-        idx = argmin(sum(scores, dims=1) ./ n)[2]
+        idx = argmin(sum(score, dims=1) ./ n)[2]
     end
 
     final = _fit(preprocess(resample.data), fit, grid[idx])
@@ -230,7 +230,7 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
         @info "Completed fitting final model"
     end
 
-    return ParameterSearch(models, scores, final)
+    return ParameterSearch(model, score, final)
 end
 
 function predict(cv::ParameterSearch, kwargs...)
