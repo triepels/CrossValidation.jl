@@ -4,7 +4,7 @@ using Base: @propagate_inbounds, Iterators.ProductIterator
 using Random: shuffle!
 using Distributed: pmap
 
-export ResampleMethod, FixedSplit, RandomSplit, LeavePOut, KFold,
+export ResampleMethod, FixedSplit, RandomSplit, KFold,
        ExhaustiveSearch,
        ModelValidation, ParameterTuning, crossvalidate,
        predict, score
