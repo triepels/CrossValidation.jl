@@ -1,6 +1,6 @@
 module CrossValidation
 
-using Base: @propagate_inbounds, Iterators.ProductIterator, product
+using Base: @propagate_inbounds, Iterators.ProductIterator
 using Printf: @sprintf
 using Random: shuffle!
 using Distributed: pmap
@@ -11,19 +11,19 @@ export ResampleMethod, FixedSplit, RandomSplit, LeavePOut, KFold,
        predict, score
 
 # Based on Knet's src/data.jl
-_nobs(data::AbstractArray) = size(data)[end]
+_nobs(x::AbstractArray) = size(x)[end]
 
-function _nobs(data::Union{Tuple, NamedTuple})
-    length(data) > 0 || throw(ArgumentError("Need at least one data input"))
-    n = _nobs(data[1])
-    if !all(x -> _nobs(x) == n, Base.tail(data))
+function _nobs(x::Union{Tuple, NamedTuple})
+    length(x) > 0 || throw(ArgumentError("Need at least one data input"))
+    n = _nobs(x[1])
+    if !all(y -> _nobs(y) == n, Base.tail(x))
         throw(DimensionMismatch("All data should contain same number of observations"))
     end
     return n
 end
 
 # Based on Knet's src/data.jl
-_getobs(x::AbstractArray, i) = x[ntuple(i -> Colon(), Val(ndims(x) - 1))..., i]
+_getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
 _getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(_getobs, i), x)
 
 abstract type ResampleMethod end
@@ -150,7 +150,7 @@ struct ExhaustiveSearch
 end
 
 function ExhaustiveSearch(; args...)
-    return ExhaustiveSearch(keys(args), product(values(args)...))
+    return ExhaustiveSearch(keys(args), Base.product(values(args)...))
 end
 
 Base.length(s::ExhaustiveSearch) = length(s.iter)
