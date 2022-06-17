@@ -34,7 +34,7 @@ struct FixedSplit{D} <: ResampleMethod
     ratio::Number
 end
 
-function FixedSplit(data; ratio::Number = 0.8)
+function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8)
     0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
     return FixedSplit(data, nobs(data), ratio)
 end
@@ -57,7 +57,7 @@ struct RandomSplit{D} <: ResampleMethod
     times::Int
 end
 
-function RandomSplit(data; ratio::Number = 0.8, times::Int = 1)
+function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8, times::Int = 1)
     0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
     0 ≤ times || throw(ArgumentError("times should be non-negative"))
     return RandomSplit(data, nobs(data), ratio, times)
@@ -83,7 +83,7 @@ struct LeavePOut{D} <: ResampleMethod
     shuffle::Bool
 end
 
-function LeavePOut(data; p::Number = 1, shuffle::Bool = true)
+function LeavePOut(data::Union{AbstractArray, Tuple, NamedTuple}; p::Number = 1, shuffle::Bool = true)
     n = nobs(data)
     0 < p < n || throw(ArgumentError("p should be in (0, $n)"))
     return LeavePOut(data, n, p, [1:n;], shuffle)
@@ -111,7 +111,7 @@ struct KFold{D} <: ResampleMethod
     shuffle::Bool
 end
 
-function KFold(data; k::Int = 10, shuffle::Bool = true)
+function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10, shuffle::Bool = true)
     n = nobs(data)
     1 < k ≤ n || throw(ArgumentError("k should be in (1, $n]"))
     return KFold(data, n, k, [1:n;], shuffle)
