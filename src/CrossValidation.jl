@@ -92,12 +92,12 @@ Base.length(r::KFold) = r.k
 Base.eltype(r::KFold{D}) where D = Tuple{D, D}
 
 @propagate_inbounds function Base.iterate(r::KFold)
-    if r.shuffle
-        shuffle!(r.indices)
-    end
     p = floor(Int, r.nobs / r.k)
     if mod(r.nobs, r.k) ≥ 1
         p = p + 1
+    end
+    if r.shuffle
+        shuffle!(r.indices)
     end
     train = slice_obs(r.data, r.indices[(p + 1):end])
     test = slice_obs(r.data, r.indices[1:p])
