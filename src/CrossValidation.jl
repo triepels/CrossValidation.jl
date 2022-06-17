@@ -10,21 +10,21 @@ export ResampleMethod, FixedSplit, RandomSplit, LeavePOut, KFold,
        ModelValidation, ParameterTuning, crossvalidate,
        predict, score
 
-# Based on Knet's src/data.jl
-_nobs(x::AbstractArray) = size(x)[end]
+nobs(x::AbstractArray) = size(x)[end]
 
-function _nobs(x::Union{Tuple, NamedTuple})
-    length(x) > 0 || throw(ArgumentError("Need at least one data input"))
-    n = _nobs(x[1])
-    if !all(y -> _nobs(y) == n, Base.tail(x))
-        throw(DimensionMismatch("All data should contain same number of observations"))
-    end
-    return n
+function nobs(x::Union{Tuple, NamedTuple})
+    equal_nobs(x) || throw(ArgumentError("all data should have the same number of observations"))
+    return nobs(x[1])
 end
 
-# Based on Knet's src/data.jl
-_getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
-_getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(_getobs, i), x)
+function equal_nobs(x::Union{Tuple, NamedTuple})
+    length(x) > 0 || return false
+    n = nobs(x[1])
+    return all(y -> nobs(y) == n, Base.tail(x))
+end
+
+slice_obs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
+slice_obs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(slice_obs, i), x)
 
 abstract type ResampleMethod end
 
@@ -34,9 +34,9 @@ struct FixedSplit{D} <: ResampleMethod
     ratio::Number
 end
 
-function FixedSplit(data; ratio=0.8)
-    0 < ratio < 1 || throw(ArgumentError("ratio should be between zero and one"))
-    return FixedSplit(data, _nobs(data), ratio)
+function FixedSplit(data; ratio::Number = 0.8)
+    0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
+    return FixedSplit(data, nobs(data), ratio)
 end
 
 Base.length(r::FixedSplit) = 1
@@ -45,8 +45,8 @@ Base.eltype(r::FixedSplit{D}) where D = Tuple{D, D}
 @propagate_inbounds function Base.iterate(r::FixedSplit, state=1)
     state > 1 && return nothing
     k = ceil(Int, r.ratio * r.nobs)
-    train = _getobs(r.data, 1:k)
-    test = _getobs(r.data, (k + 1):r.nobs)
+    train = slice_obs(r.data, 1:k)
+    test = slice_obs(r.data, (k + 1):r.nobs)
     return ((train, test), state + 1)
 end
 
@@ -57,9 +57,10 @@ struct RandomSplit{D} <: ResampleMethod
     times::Int
 end
 
-function RandomSplit(data; ratio=0.8, times=1)
-    0 < ratio < 1 || throw(ArgumentError("ratio should be between zero and one"))
-    return RandomSplit(data, _nobs(data), ratio, times)
+function RandomSplit(data; ratio::Number = 0.8, times::Int = 1)
+    0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
+    0 ≤ times || throw(ArgumentError("times should be non-negative"))
+    return RandomSplit(data, nobs(data), ratio, times)
 end
 
 Base.length(r::RandomSplit) = r.times
@@ -67,10 +68,10 @@ Base.eltype(r::RandomSplit{D}) where D = Tuple{D, D}
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state=1)
     state > r.times && return nothing
-    indices = shuffle!([1:r.nobs;])
     k = ceil(Int, r.ratio * r.nobs)
-    train = _getobs(r.data, indices[1:k])
-    test = _getobs(r.data, indices[(k + 1):end])
+    indices = shuffle!([1:r.nobs; ])
+    train = slice_obs(r.data, indices[1:k])
+    test = slice_obs(r.data, indices[(k + 1):end])
     return ((train, test), state + 1)
 end
 
@@ -82,9 +83,9 @@ struct LeavePOut{D} <: ResampleMethod
     shuffle::Bool
 end
 
-function LeavePOut(data; p=1, shuffle=true)
-    n = _nobs(data)
-    0 < p < n || throw(ArgumentError("p should be between 0 and $n"))
+function LeavePOut(data; p::Number = 1, shuffle::Bool = true)
+    n = nobs(data)
+    0 < p < n || throw(ArgumentError("p should be in (0, $n)"))
     return LeavePOut(data, n, p, [1:n;], shuffle)
 end
 
@@ -97,8 +98,8 @@ Base.eltype(r::LeavePOut{D}) where D = Tuple{D, D}
         shuffle!(r.indices)
     end
     fold = ((state - 1) * r.p + 1):(state * r.p)
-    train = _getobs(r.data, r.indices[1:end .∉ Ref(fold)])
-    test = _getobs(r.data, r.indices[fold])
+    train = slice_obs(r.data, r.indices[1:end .∉ Ref(fold)])
+    test = slice_obs(r.data, r.indices[fold])
     return ((train, test), state + 1)
 end
 
@@ -110,9 +111,9 @@ struct KFold{D} <: ResampleMethod
     shuffle::Bool
 end
 
-function KFold(data; k=10, shuffle=true)
-    n = _nobs(data)
-    1 < k < n + 1 || throw(ArgumentError("k should be between 1 and $(n + 1)"))
+function KFold(data; k::Int = 10, shuffle::Bool = true)
+    n = nobs(data)
+    1 < k ≤ n || throw(ArgumentError("k should be in (1, $n]"))
     return KFold(data, n, k, [1:n;], shuffle)
 end
 
@@ -127,8 +128,8 @@ Base.eltype(r::KFold{D}) where D = Tuple{D, D}
     if mod(r.nobs, r.k) ≥ 1
         p = p + 1
     end
-    train = _getobs(r.data, r.indices[(p + 1):end])
-    test = _getobs(r.data, r.indices[1:p])
+    train = slice_obs(r.data, r.indices[(p + 1):end])
+    test = slice_obs(r.data, r.indices[1:p])
     return ((train, test), (2, p))
 end
 
@@ -139,8 +140,8 @@ end
         p = p + 1
     end
     fold = (state[2] + 1):(state[2] + p)
-    train = _getobs(r.data, r.indices[1:end .∉ Ref(fold)])
-    test = _getobs(r.data, r.indices[fold])
+    train = slice_obs(r.data, r.indices[1:end .∉ Ref(fold)])
+    test = slice_obs(r.data, r.indices[fold])
     return ((train, test), (state[1] + 1, state[2] + p))
 end
 
@@ -167,13 +168,13 @@ function Base.iterate(s::ExhaustiveSearch, state)
     return (NamedTuple{s.keys}(next[1]), next[2])
 end
 
-_fit(data::AbstractArray, fit) = fit(data)
-_fit(data::Union{Tuple, NamedTuple}, fit) = fit(data...)
-_fit(data::AbstractArray, fit, args) = fit(data; args...)
-_fit(data::Union{Tuple, NamedTuple}, fit, args) = fit(data...; args...)
+_fit(x::AbstractArray, fit) = fit(x)
+_fit(x::Union{Tuple, NamedTuple}, fit) = fit(x...)
+_fit(x::AbstractArray, fit, args) = fit(x; args...)
+_fit(x::Union{Tuple, NamedTuple}, fit, args) = fit(x...; args...)
 
-_score(data::AbstractArray, model) = score(model, data)
-_score(data::Union{Tuple, NamedTuple}, model) = score(model, data...)
+_score(x::AbstractArray, model) = score(model, x)
+_score(x::Union{Tuple, NamedTuple}, model) = score(model, x...)
 
 struct ModelValidation{T1,T2}
     models::Array{T1, 1}
@@ -189,7 +190,7 @@ end
 nopreprocess(train) = train
 nopreprocess(train, test) = train, test
 
-function crossvalidate(fit::Function, resample::ResampleMethod; preprocess=nopreprocess, verbose=false)
+function crossvalidate(fit::Function, resample::ResampleMethod; preprocess::Function = nopreprocess, verbose::Bool = false)
     n = length(resample)
     models = Array{Any, 1}(undef, n)
     scores = Array{Any, 1}(undef, n)
@@ -216,7 +217,7 @@ function crossvalidate(fit::Function, resample::ResampleMethod; preprocess=nopre
     return ModelValidation(models, scores)
 end
 
-function crossvalidate(fit::Function, resample::ResampleMethod, search::ExhaustiveSearch; preprocess=nopreprocess, maximize=true, verbose=false)
+function crossvalidate(fit::Function, resample::ResampleMethod, search::ExhaustiveSearch; preprocess::Function = nopreprocess, maximize::Bool = true, verbose::Bool = false)
     grid = collect(search)
     n, m = length(resample), length(grid)
     models = Array{Any, 2}(undef, n, m)
