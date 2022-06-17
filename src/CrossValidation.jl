@@ -75,34 +75,6 @@ Base.eltype(r::RandomSplit{D}) where D = Tuple{D, D}
     return ((train, test), state + 1)
 end
 
-struct LeavePOut{D} <: ResampleMethod
-    data::D
-    nobs::Int
-    p::Int
-    indices::Vector{Int}
-    shuffle::Bool
-end
-
-function LeavePOut(data::Union{AbstractArray, Tuple, NamedTuple}; p::Number = 1, shuffle::Bool = true)
-    n = nobs(data)
-    0 < p < n || throw(ArgumentError("p should be in (0, $n)"))
-    return LeavePOut(data, n, p, [1:n;], shuffle)
-end
-
-Base.length(r::LeavePOut) = floor(Int, r.nobs / r.p)
-Base.eltype(r::LeavePOut{D}) where D = Tuple{D, D}
-
-@propagate_inbounds function Base.iterate(r::LeavePOut, state=1)
-    state > length(r) && return nothing
-    if r.shuffle && state == 1
-        shuffle!(r.indices)
-    end
-    fold = ((state - 1) * r.p + 1):(state * r.p)
-    train = slice_obs(r.data, r.indices[1:end .∉ Ref(fold)])
-    test = slice_obs(r.data, r.indices[fold])
-    return ((train, test), state + 1)
-end
-
 struct KFold{D} <: ResampleMethod
     data::D
     nobs::Int
