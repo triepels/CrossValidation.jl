@@ -1,7 +1,6 @@
 module CrossValidation
 
 using Base: @propagate_inbounds, Iterators.ProductIterator
-using Printf: @sprintf
 using Random: shuffle!
 using Distributed: pmap
 
@@ -180,7 +179,7 @@ function crossvalidate(fit::Function, resample::ResampleMethod; preprocess::Func
         end
 
         if verbose
-            @info "Completed iteration $i of $n (score: $(@sprintf("%.4f", scores[i]))"
+            @info "Completed iteration $i of $n"
         end
 
         i = i + 1
@@ -213,7 +212,7 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
             else
                 best = min(scores[i,:]...)
             end
-            @info "Completed iteration $i of $n (best score: $(@sprintf("%.4f", best)))"
+            @info "Completed iteration $i of $n"
         end
 
         i = i + 1
