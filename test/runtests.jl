@@ -24,6 +24,6 @@ search = ExhaustiveSearch(a=1:2, b=3:4)
 
 cv = crossvalidate(mymodel, KFold(x), search)
 
-cv = crossvalidate((x) -> mymodel(x, a=1, b=2), LeavePOut(x))
+cv = crossvalidate((x) -> mymodel(x, a=1, b=2), KFold(x))
 
 cv = crossvalidate((x) -> crossvalidate(mymodel, FixedSplit(x), search), RandomSplit(x))
