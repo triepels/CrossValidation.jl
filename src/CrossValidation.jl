@@ -12,107 +12,146 @@ export ResampleMethod, FixedSplit, RandomSplit, KFold,
 nobs(x::AbstractArray) = size(x)[end]
 
 function nobs(x::Union{Tuple, NamedTuple})
-    equal_nobs(x) || throw(ArgumentError("all data should have the same number of observations"))
+    equalobs(x) || throw(ArgumentError("all data should have the same number of observations"))
     return nobs(x[1])
 end
 
-function equal_nobs(x::Union{Tuple, NamedTuple})
+function equalobs(x::Union{Tuple, NamedTuple})
     length(x) > 0 || return false
     n = nobs(x[1])
     return all(y -> nobs(y) == n, Base.tail(x))
 end
 
-slice_obs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
-slice_obs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(slice_obs, i), x)
+getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
+getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
 
 abstract type ResampleMethod end
 
+restype(x) = restype(typeof(x))
+restype(x::Tuple) = Tuple{map(restype, x)...}
+restype(::Type{T1}) where T1 <: Base.ReshapedArray{T2, N} where {T2, N} = Array{eltype(T1), N}
+restype(::Type{T1}) where T1 <: Base.SubArray{T2, N} where {T2, N} = Array{eltype(T1), N}
+restype(::Type{T}) where T = T
+
 struct FixedSplit{D} <: ResampleMethod
-    data::D
-    nobs::Int
+    x::D
     ratio::Number
 end
 
-function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8)
+function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8)
     0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
-    return FixedSplit(data, nobs(data), ratio)
+    return FixedSplit(x, ratio)
 end
 
 Base.length(r::FixedSplit) = 1
-Base.eltype(r::FixedSplit{D}) where D = Tuple{D, D}
+Base.eltype(r::FixedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
-@propagate_inbounds function Base.iterate(r::FixedSplit, state=1)
+@propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
-    k = ceil(Int, r.ratio * r.nobs)
-    train = slice_obs(r.data, 1:k)
-    test = slice_obs(r.data, (k + 1):r.nobs)
+    n = nobs(r.x)
+    k = ceil(Int, r.ratio * n)
+    train = getobs(r.x, 1:k)
+    test = getobs(r.x, (k + 1):n)
     return ((train, test), state + 1)
 end
 
 struct RandomSplit{D} <: ResampleMethod
-    data::D
-    nobs::Int
+    x::D
     ratio::Number
     times::Int
 end
 
-function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8, times::Int = 1)
+function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8, times::Int = 1)
     0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
     0 ≤ times || throw(ArgumentError("times should be non-negative"))
-    return RandomSplit(data, nobs(data), ratio, times)
+    return RandomSplit(x, ratio, times)
 end
 
 Base.length(r::RandomSplit) = r.times
-Base.eltype(r::RandomSplit{D}) where D = Tuple{D, D}
+Base.eltype(r::RandomSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
-@propagate_inbounds function Base.iterate(r::RandomSplit, state=1)
+@propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > r.times && return nothing
-    k = ceil(Int, r.ratio * r.nobs)
-    indices = shuffle!([1:r.nobs; ])
-    train = slice_obs(r.data, indices[1:k])
-    test = slice_obs(r.data, indices[(k + 1):end])
+    n = nobs(r.x)
+    k = ceil(Int, r.ratio * n)
+    inds = shuffle!([1:n; ])
+    train = getobs(r.x, inds[1:k])
+    test = getobs(r.x, inds[(k + 1):end])
+    return ((train, test), state + 1)
+end
+
+struct StratifiedSplit{D} <: ResampleMethod
+    x::D
+    ratio::Number
+    times::Int
+    strata::Vector{Vector{Int}}
+end
+
+function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; ratio::Number = 0.8, times::Int = 1)
+    0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
+    0 < times || throw(ArgumentError("times should be > 0"))
+    strata = map(s -> findall(y .== s), unique(y))
+    return StratifiedSplit(x, ratio, times, strata)
+end
+
+Base.length(r::StratifiedSplit) = r.times
+Base.eltype(r::StratifiedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
+
+@propagate_inbounds function Base.iterate(r::StratifiedSplit, state = 1)
+    state > r.times && return nothing
+    n = nobs(r.x)
+    inds = sizehint!(Int[], ceil(Int, r.ratio * n))
+    for s in r.strata
+        shuffle!(s)
+        k = ceil(Int, r.ratio * length(s))
+        append!(inds, s[1:k])
+    end
+    shuffle!(inds)
+    train = getobs(r.x, inds)
+    test = getobs(r.x, setdiff(1:n, inds))
     return ((train, test), state + 1)
 end
 
 struct KFold{D} <: ResampleMethod
-    data::D
-    nobs::Int
+    x::D
     k::Int
-    indices::Vector{Int}
     shuffle::Bool
+    inds::Vector{Int}
 end
 
-function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10, shuffle::Bool = true)
-    n = nobs(data)
+function KFold(x::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10, shuffle::Bool = true)
+    n = nobs(x)
     1 < k ≤ n || throw(ArgumentError("k should be in (1, $n]"))
-    return KFold(data, n, k, [1:n;], shuffle)
+    return KFold(x, k, shuffle, [1:n;])
 end
 
 Base.length(r::KFold) = r.k
-Base.eltype(r::KFold{D}) where D = Tuple{D, D}
+Base.eltype(r::KFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::KFold)
-    p = floor(Int, r.nobs / r.k)
-    if mod(r.nobs, r.k) ≥ 1
+    n = nobs(r.x)
+    p = floor(Int, n / r.k)
+    if mod(n, r.k) ≥ 1
         p = p + 1
     end
     if r.shuffle
-        shuffle!(r.indices)
+        shuffle!(r.inds)
     end
-    train = slice_obs(r.data, r.indices[(p + 1):end])
-    test = slice_obs(r.data, r.indices[1:p])
+    train = getobs(r.x, r.inds[(p + 1):end])
+    test = getobs(r.x, r.inds[1:p])
     return ((train, test), (2, p))
 end
 
 @propagate_inbounds function Base.iterate(r::KFold, state)
     state[1] > r.k && return nothing
-    p = floor(Int, r.nobs / r.k)
-    if mod(r.nobs, r.k) ≥ state[1]
+    n = nobs(r.x)
+    p = floor(Int, n / r.k)
+    if mod(n, r.k) ≥ state[1]
         p = p + 1
     end
     fold = (state[2] + 1):(state[2] + p)
-    train = slice_obs(r.data, r.indices[1:end .∉ Ref(fold)])
-    test = slice_obs(r.data, r.indices[fold])
+    train = getobs(r.x, r.inds[1:end .∉ Ref(fold)])
+    test = getobs(r.x, r.inds[fold])
     return ((train, test), (state[1] + 1, state[2] + p))
 end
 
