@@ -88,6 +88,7 @@ struct StratifiedSplit{D} <: ResampleMethod
 end
 
 function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; ratio::Number = 0.8, times::Int = 1)
+    nobs(x) == nobs(y) || throw(ArgumentError("data should have the same number of observations"))
     0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
     0 < times || throw(ArgumentError("times should be > 0"))
     strata = map(s -> findall(y .== s), unique(y))
