@@ -129,7 +129,7 @@ end
 We can now use the `CrossValidation.jl` package similarly as in the supervised learning example. We will demonstrate this by performing model validation.
 
 ## Model Validation
-It might be of interest to validate how well `MyModel` performs out of sample. We do this by performing model validation. The `CrossValidation.jl` allows performing model validation based on various resampling methods. Let us use random split (holdout) sampling where 80% of the data is sampled for training and the remaining 20% for testing:
+It might be of interest to validate how well `MyModel` performs out of sample. We do this by performing model validation. The `CrossValidation.jl` allows performing model validation based on various resampling methods. Let us use random split (holdout) sampling where 80% of the data is sampled for training and the remaining 20% of the data is sampled for testing:
 
 ```julia
 resample = RandomSplit(x, ratio=0.8)
