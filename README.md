@@ -80,8 +80,8 @@ cv = crossvalidate(mymodel, resample, search)
 ```
 
 The result of the search is an object of type `ParameterSearch` with three data members: 
-* `models`: an array of models that are fitted during the parameter search.
-* `scores`: an array holding the scores of the models as estimated by the `score` function. The array has a size of `n` x `m`, where `n` is the number of folds and `m` the number of parameter configurations.
+* `model`: an array of models that are fitted during the parameter search.
+* `score`: an array holding the scores of the models as estimated by the `score` function. The array has a size of `n` x `m`, where `n` is the number of folds and `m` the number of parameter configurations.
 * `final`: the final model that is fitted on the entire dataset based on the parameter configuration that performed on average the best over all folds.
 
 We can use function `predict` to generate predictions by the final model:
@@ -143,8 +143,8 @@ crossvalidate(mymodel, resample)
 ```
 
 The result of the validation is an object of type `ModelValidation` with two data members:
-* `models`: an array of models that are fitted during the model validation.
-* `scores`: an array holding the scores of the models as estimated by the `score` function. The array has a size of `n` x 1, where `n` is the number of folds.
+* `model`: an array of models that are fitted during the model validation.
+* `score`: an array holding the scores of the models as estimated by the `score` function. The array has a size of `n` x 1, where `n` is the number of folds.
 
 ## Nested Cross-Validation
 In some cases, a model needs to be validated on some data, but the model has some hyperparameters that need to be tuned for each fold as well. This can be done by nested cross-validation. Performing nested cross-validation using the `CrossValidation.jl` package is straightforward. Let us perform nested cross-validation for `MyClassifier` as defined in the previous example. First, we define a grid of parameters that we want to try out in the inner loop:
@@ -160,5 +160,5 @@ crossvalidate((x, y) -> crossvalidate(myclassifier, RandomSplit((x, y)), search)
 ```
 
 Here, we use random split (holdout) validation for the inner loop and k-fold cross-validation for the outer loop. The result of the nested cross-validation is an object of type `ModelValidation` with two data members:
-* `models`: an array of `ParameterSearch` objects that are created by the inner loop of the nested cross-validation.
-* `scores`: an array holding the scores of the best performing models of each parameter search as estimated by the `score` function. The array has a size of `n` x 1, where `n` is the number of folds.
+* `model`: an array of `ParameterSearch` objects that are created by the inner loop of the nested cross-validation.
+* `score`: an array holding the scores of the best performing models of each parameter search as estimated by the `score` function. The array has a size of `n` x 1, where `n` is the number of folds.
