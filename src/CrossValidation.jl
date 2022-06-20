@@ -125,14 +125,13 @@ struct KFold{D} <: ResampleMethod
     x::D
     n::Int
     k::Int
-    shuffle::Bool
     inds::Vector{Int}
 end
 
-function KFold(x::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10, shuffle::Bool = true)
+function KFold(x::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
     n = nobs(x)
     1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
-    return KFold(x, n, k, shuffle, [1:n;])
+    return KFold(x, n, k, [1:n;])
 end
 
 Base.length(r::KFold) = r.k
@@ -140,7 +139,7 @@ Base.eltype(r::KFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 Base.@propagate_inbounds function Base.iterate(r::KFold, state = 1)
     state > r.k && return nothing
-    if state == 1 && r.shuffle
+    if state == 1
         shuffle!(r.inds)
     end
     m = mod(r.n, r.k)
@@ -155,11 +154,10 @@ struct StratifiedKFold{D} <: ResampleMethod
     x::D
     n::Int
     k::Int
-    shuffle::Bool
     strata::Vector{Vector{Int}}
 end
 
-function StratifiedKFold(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; k::Int = 10, shuffle::Bool = true)
+function StratifiedKFold(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; k::Int = 10)
     n = nobs(x)
     nobs(y) == n || throw(ArgumentError("data should have the same number of observations"))
 
@@ -168,7 +166,7 @@ function StratifiedKFold(x::Union{AbstractArray, Tuple, NamedTuple}, y::Abstract
         length(s) ≥ k || throw(ArgumentError("not all strata can be partitioned into $k folds"))
     end
 
-    return StratifiedKFold(x, n, k, shuffle, strata)
+    return StratifiedKFold(x, n, k, strata)
 end
 
 Base.length(r::StratifiedKFold) = r.k
@@ -177,12 +175,10 @@ Base.eltype(r::StratifiedKFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
 Base.@propagate_inbounds function Base.iterate(r::StratifiedKFold, state = 1)
     state > r.k && return nothing
     inds = sizehint!(Int[], ceil(Int, (1 / r.k) * r.n))
-    if state == 1 && r.shuffle
-        for s in r.strata
+    for s in r.strata
+        if state == 1
             shuffle!(s)
         end
-    end
-    for s in r.strata
         m = mod(length(s), r.k)
         w = floor(Int, length(s) / r.k)
         fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
