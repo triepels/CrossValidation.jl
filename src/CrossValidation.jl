@@ -4,7 +4,7 @@ using Base: @propagate_inbounds, Iterators.ProductIterator
 using Random: shuffle!
 using Distributed: pmap
 
-export ResampleMethod, FixedSplit, RandomSplit, KFold,
+export ResampleMethod, FixedSplit, RandomSplit, StratifiedSplit, KFold, StratifiedKFold,
        ExhaustiveSearch,
        ModelValidation, ParameterTuning, crossvalidate,
        predict, score
@@ -35,12 +35,14 @@ restype(::Type{T}) where T = T
 
 struct FixedSplit{D} <: ResampleMethod
     x::D
+    n::Int
     ratio::Number
 end
 
 function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8)
-    0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
-    return FixedSplit(x, ratio)
+    n = nobs(x)
+    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be partitioned based on a $ratio ratio"))
+    return FixedSplit(x, n, ratio)
 end
 
 Base.length(r::FixedSplit) = 1
@@ -48,23 +50,24 @@ Base.eltype(r::FixedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
-    n = nobs(r.x)
-    k = ceil(Int, r.ratio * n)
+    k = ceil(Int, r.ratio * r.n)
     train = getobs(r.x, 1:k)
-    test = getobs(r.x, (k + 1):n)
-    return ((train, test), state + 1)
+    test = getobs(r.x, (k + 1):r.n)
+    return (train, test), state + 1
 end
 
 struct RandomSplit{D} <: ResampleMethod
     x::D
+    n::Int
     ratio::Number
     times::Int
 end
 
 function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8, times::Int = 1)
-    0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
-    0 ≤ times || throw(ArgumentError("times should be non-negative"))
-    return RandomSplit(x, ratio, times)
+    n = nobs(x)
+    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be partitioned based on a $ratio ratio"))
+    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
+    return RandomSplit(x, n, ratio, times)
 end
 
 Base.length(r::RandomSplit) = r.times
@@ -72,27 +75,33 @@ Base.eltype(r::RandomSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > r.times && return nothing
-    n = nobs(r.x)
-    k = ceil(Int, r.ratio * n)
-    inds = shuffle!([1:n; ])
+    k = ceil(Int, r.ratio * r.n)
+    inds = shuffle!([1:r.n; ])
     train = getobs(r.x, inds[1:k])
     test = getobs(r.x, inds[(k + 1):end])
-    return ((train, test), state + 1)
+    return (train, test), state + 1
 end
 
 struct StratifiedSplit{D} <: ResampleMethod
     x::D
+    n::Int
     ratio::Number
     times::Int
     strata::Vector{Vector{Int}}
 end
 
 function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; ratio::Number = 0.8, times::Int = 1)
-    nobs(x) == nobs(y) || throw(ArgumentError("data should have the same number of observations"))
-    0 < ratio < 1 || throw(ArgumentError("ratio should be in (0, 1)"))
-    0 < times || throw(ArgumentError("times should be > 0"))
+    n = nobs(x)
+    nobs(y) == n || throw(ArgumentError("data should have the same number of observations"))
+    
     strata = map(s -> findall(y .== s), unique(y))
-    return StratifiedSplit(x, ratio, times, strata)
+    for s in strata
+        1 ≤ length(s) * ratio ≤ n - 1 || throw(ArgumentError("not all strata can be partitioned based on a $ratio ratio"))
+    end
+
+    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
+
+    return StratifiedSplit(x, nobs(x), ratio, times, strata)
 end
 
 Base.length(r::StratifiedSplit) = r.times
@@ -100,8 +109,7 @@ Base.eltype(r::StratifiedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::StratifiedSplit, state = 1)
     state > r.times && return nothing
-    n = nobs(r.x)
-    inds = sizehint!(Int[], ceil(Int, r.ratio * n))
+    inds = sizehint!(Int[], ceil(Int, r.ratio * r.n))
     for s in r.strata
         shuffle!(s)
         k = ceil(Int, r.ratio * length(s))
@@ -109,12 +117,13 @@ Base.eltype(r::StratifiedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
     end
     shuffle!(inds)
     train = getobs(r.x, inds)
-    test = getobs(r.x, setdiff(1:n, inds))
-    return ((train, test), state + 1)
+    test = getobs(r.x, setdiff(1:r.n, inds))
+    return (train, test), state + 1
 end
 
 struct KFold{D} <: ResampleMethod
     x::D
+    n::Int
     k::Int
     shuffle::Bool
     inds::Vector{Int}
@@ -122,38 +131,67 @@ end
 
 function KFold(x::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10, shuffle::Bool = true)
     n = nobs(x)
-    1 < k ≤ n || throw(ArgumentError("k should be in (1, $n]"))
-    return KFold(x, k, shuffle, [1:n;])
+    1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
+    return KFold(x, n, k, shuffle, [1:n;])
 end
 
 Base.length(r::KFold) = r.k
 Base.eltype(r::KFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
-@propagate_inbounds function Base.iterate(r::KFold)
-    n = nobs(r.x)
-    p = floor(Int, n / r.k)
-    if mod(n, r.k) ≥ 1
-        p = p + 1
-    end
-    if r.shuffle
+Base.@propagate_inbounds function Base.iterate(r::KFold, state = 1)
+    state > r.k && return nothing
+    if state == 1 && r.shuffle
         shuffle!(r.inds)
     end
-    train = getobs(r.x, r.inds[(p + 1):end])
-    test = getobs(r.x, r.inds[1:p])
-    return ((train, test), (2, p))
-end
-
-@propagate_inbounds function Base.iterate(r::KFold, state)
-    state[1] > r.k && return nothing
-    n = nobs(r.x)
-    p = floor(Int, n / r.k)
-    if mod(n, r.k) ≥ state[1]
-        p = p + 1
-    end
-    fold = (state[2] + 1):(state[2] + p)
+    m = mod(r.n, r.k)
+    w = floor(Int, r.n / r.k)
+    fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
     train = getobs(r.x, r.inds[1:end .∉ Ref(fold)])
     test = getobs(r.x, r.inds[fold])
-    return ((train, test), (state[1] + 1, state[2] + p))
+    return (train, test), state + 1
+end
+
+struct StratifiedKFold{D} <: ResampleMethod
+    x::D
+    n::Int
+    k::Int
+    shuffle::Bool
+    strata::Vector{Vector{Int}}
+end
+
+function StratifiedKFold(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; k::Int = 10, shuffle::Bool = true)
+    n = nobs(x)
+    nobs(y) == n || throw(ArgumentError("data should have the same number of observations"))
+
+    strata = map(s -> findall(y .== s), unique(y))
+    for s in strata
+        length(s) ≥ k || throw(ArgumentError("not all strata can be partitioned into $k folds"))
+    end
+
+    return StratifiedKFold(x, n, k, shuffle, strata)
+end
+
+Base.length(r::StratifiedKFold) = r.k
+Base.eltype(r::StratifiedKFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
+
+Base.@propagate_inbounds function Base.iterate(r::StratifiedKFold, state = 1)
+    state > r.k && return nothing
+    inds = sizehint!(Int[], ceil(Int, (1 / r.k) * r.n))
+    if state == 1 && r.shuffle
+        for s in r.strata
+            shuffle!(s)
+        end
+    end
+    for s in r.strata
+        m = mod(length(s), r.k)
+        w = floor(Int, length(s) / r.k)
+        fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
+        append!(inds, s[fold])
+    end
+    shuffle!(inds)
+    train = getobs(r.x, setdiff(1:r.n, inds))
+    test = getobs(r.x, inds)
+    return (train, test), state + 1
 end
 
 struct ExhaustiveSearch
@@ -264,7 +302,7 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
         idx = argmin(sum(score, dims=1) ./ n)[2]
     end
 
-    final = _fit(preprocess(resample.data), fit, grid[idx])
+    final = _fit(preprocess(resample.x), fit, grid[idx])
 
     if verbose
         @info "Completed fitting final model"

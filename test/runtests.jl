@@ -18,12 +18,15 @@ function score(model::MyModel, x::AbstractArray)
     return sum(predict(model, x) - x)
 end
 
-x = rand(2, 10)
+x = rand(2, 100)
+y = rand(100) .≥ 0.5
 
 search = ExhaustiveSearch(a=1:2, b=3:4)
 
+cv = crossvalidate(mymodel, FixedSplit(x), search)
+cv = crossvalidate(mymodel, RandomSplit(x), search)
+cv = crossvalidate(mymodel, StratifiedSplit(x, y), search)
 cv = crossvalidate(mymodel, KFold(x), search)
-
-cv = crossvalidate((x) -> mymodel(x, a=1, b=2), KFold(x))
+cv = crossvalidate(mymodel, StratifiedKFold(x, y), search)
 
 cv = crossvalidate((x) -> crossvalidate(mymodel, FixedSplit(x), search), RandomSplit(x))
