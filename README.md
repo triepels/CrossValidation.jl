@@ -10,8 +10,9 @@ Validation schemes:
 Resample methods:
 * Fixed split
 * Random split (holdout)
-* Leave-P-Out
+* Stratified Split (stratified holdout)
 * K-Fold
+* Stratified K-Fold
 
 Search methods:
 * Exhaustive search
