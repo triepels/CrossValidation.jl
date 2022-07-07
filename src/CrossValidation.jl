@@ -237,8 +237,8 @@ nopreprocess(train, test) = train, test
 
 function crossvalidate(fit::Function, resample::ResampleMethod; preprocess::Function = nopreprocess, verbose::Bool = false)
     n = length(resample)
-    model = Array{Any, 1}(undef, n)
-    score = Array{Any, 1}(undef, n)
+    model = Vector{Any}(undef, n)
+    score = Vector{Any}(undef, n)
 
     i = 1
     for (train, test) in resample
@@ -248,8 +248,8 @@ function crossvalidate(fit::Function, resample::ResampleMethod; preprocess::Func
         score[i] = _score(test, model[i])
 
         if i == 1
-            model = convert(Array{typeof(model[1])}, model)
-            score = convert(Array{typeof(score[1])}, score)
+            model = convert(Vector{typeof(model[1])}, model)
+            score = convert(Vector{typeof(score[1])}, score)
         end
 
         if verbose
