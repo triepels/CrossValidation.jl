@@ -28,5 +28,7 @@ cv = crossvalidate(mymodel, RandomSplit(x), search)
 cv = crossvalidate(mymodel, StratifiedSplit(x, y), search)
 cv = crossvalidate(mymodel, KFold(x), search)
 cv = crossvalidate(mymodel, StratifiedKFold(x, y), search)
+cv = crossvalidate(mymodel, ForwardChaining(x, init = 40, test = 10), search)
+cv = crossvalidate(mymodel, SlidingWindow(x, train = 40, test = 10), search)
 
 cv = crossvalidate((x) -> crossvalidate(mymodel, FixedSplit(x), search), RandomSplit(x))
