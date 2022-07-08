@@ -39,16 +39,16 @@ struct FixedSplit{D} <: ResampleMethod
     m::Int
 end
 
-function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8)
-    n = nobs(x)
-    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return FixedSplit(x, n, ceil(Int, ratio * n))
-end
-
-function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}; m::Int = 1)
+function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     n = nobs(x)
     1 ≤ m ≤ n - 1 || throw(ArgumentError("data cannot be split by $m"))
     return FixedSplit(x, n, m)
+end
+
+function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
+    n = nobs(x)
+    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
+    return FixedSplit(x, n, ceil(Int, ratio * n))
 end
 
 Base.length(r::FixedSplit) = 1
@@ -68,18 +68,18 @@ struct RandomSplit{D} <: ResampleMethod
     times::Int
 end
 
-function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8, times::Int = 1)
-    n = nobs(x)
-    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
-    return RandomSplit(x, n, ceil(Int, ratio * n), times)
-end
-
-function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}; m::Int = 1, times::Int = 1)
+function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}, m::Int; times::Int = 1)
     n = nobs(x)
     1 ≤ m ≤ n - 1 || throw(ArgumentError("data cannot be split by $m"))
     0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
     return RandomSplit(x, n, m, times)
+end
+
+function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8; times::Int = 1)
+    n = nobs(x)
+    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
+    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
+    return RandomSplit(x, n, ceil(Int, ratio * n), times)
 end
 
 Base.length(r::RandomSplit) = r.times
@@ -96,24 +96,39 @@ end
 struct StratifiedSplit{D} <: ResampleMethod
     x::D
     n::Int
-    ratio::Number
+    m::Int
     times::Int
     strata::Vector{Vector{Int}}
 end
 
-function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; ratio::Number = 0.8, times::Int = 1)
+function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector, m::Int; times::Int = 1)
     n = nobs(x)
     nobs(y) == n || throw(ArgumentError("data and conditional data should have the same number of observations"))
     
     strata = map(s -> findall(y .== s), unique(y))
     for s in strata
         l = length(s)
-        1 ≤ l * ratio ≤ l - 1 || throw(ArgumentError("not all strata can be split based on a $ratio ratio"))
+        1 ≤ l / n * m ≤ l - 1 || throw(ArgumentError("unable to stratify data by $m"))
     end
 
     0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
 
-    return StratifiedSplit(x, n, ratio, times, strata)
+    return StratifiedSplit(x, n, m, times, strata)
+end
+
+function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector, ratio::Number = 0.8; times::Int = 1)
+    n = nobs(x)
+    nobs(y) == n || throw(ArgumentError("data and conditional data should have the same number of observations"))
+    
+    strata = map(s -> findall(y .== s), unique(y))
+    for s in strata
+        l = length(s)
+        1 ≤ l * ratio ≤ l - 1 || throw(ArgumentError("unable to stratify data based on a $ratio ratio"))
+    end
+
+    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
+
+    return StratifiedSplit(x, n, ceil(Int, ratio * n), times, strata)
 end
 
 Base.length(r::StratifiedSplit) = r.times
@@ -121,11 +136,11 @@ Base.eltype(r::StratifiedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::StratifiedSplit, state = 1)
     state > r.times && return nothing
-    inds = sizehint!(Int[], ceil(Int, r.ratio * r.n))
+    inds = sizehint!(Int[], r.m)
     for s in r.strata
         shuffle!(s)
-        k = ceil(Int, r.ratio * length(s))
-        append!(inds, s[1:k])
+        m = round(Int, length(s) / r.n * r.m)
+        append!(inds, s[1:m])
     end
     shuffle!(inds)
     train = getobs(r.x, inds)
