@@ -217,6 +217,40 @@ Base.@propagate_inbounds function Base.iterate(r::StratifiedKFold, state = 1)
     return (train, test), state + 1
 end
 
+struct ForwardChaining{D} <: ResampleMethod
+    x::D
+    n::Int
+    init::Int
+    test::Int
+    partial::Bool
+end
+
+function ForwardChaining(x::Union{AbstractArray, Tuple, NamedTuple}; init::Int, test::Int, partial::Bool = true)
+    n = nobs(x)
+    1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
+    1 ≤ test ≤ n || throw(ArgumentError("invalid test window of $test"))
+    init + test ≤ n || throw(ArgumentError("initial and test window exceed the number of data observations"))
+    return ForwardChaining(x, n, init, test, partial)
+end
+
+function Base.length(r::ForwardChaining)
+    l = (r.n - r.init) / r.test
+    if r.partial
+        ceil(Int, l)
+    else
+        floor(Int, l)
+    end
+end
+
+Base.eltype(r::ForwardChaining{D}) where D = Tuple{restype(r.x), restype(r.x)}
+
+function Base.iterate(r::ForwardChaining, state = 1)
+    state > length(r) && return nothing
+    train = getobs(r.x, 1:(r.init + (state - 1) * r.test))
+    test = getobs(r.x, (r.init + (state - 1) * r.test + 1):min(r.init + state * r.test, r.n))
+    return (train, test), state + 1
+end
+
 struct ExhaustiveSearch
     keys::Tuple
     iter::ProductIterator
