@@ -103,16 +103,17 @@ end
 
 function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; ratio::Number = 0.8, times::Int = 1)
     n = nobs(x)
-    nobs(y) == n || throw(ArgumentError("data should have the same number of observations"))
+    nobs(y) == n || throw(ArgumentError("data and conditional data should have the same number of observations"))
     
     strata = map(s -> findall(y .== s), unique(y))
     for s in strata
-        1 ≤ length(s) * ratio ≤ n - 1 || throw(ArgumentError("not all strata can be partitioned based on a $ratio ratio"))
+        l = length(s)
+        1 ≤ l * ratio ≤ l - 1 || throw(ArgumentError("not all strata can be split based on a $ratio ratio"))
     end
 
     0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
 
-    return StratifiedSplit(x, nobs(x), ratio, times, strata)
+    return StratifiedSplit(x, n, ratio, times, strata)
 end
 
 Base.length(r::StratifiedSplit) = r.times
