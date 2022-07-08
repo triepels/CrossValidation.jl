@@ -13,6 +13,8 @@ Resample methods:
 * Stratified split (stratified holdout)
 * K-Fold
 * Stratified k-fold
+* Forward chaining
+* Sliding window
 
 Search methods:
 * Exhaustive search
