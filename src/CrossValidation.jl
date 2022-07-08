@@ -36,13 +36,19 @@ restype(::Type{T}) where T = T
 struct FixedSplit{D} <: ResampleMethod
     x::D
     n::Int
-    ratio::Number
+    m::Int
 end
 
 function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8)
     n = nobs(x)
-    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be partitioned based on a $ratio ratio"))
-    return FixedSplit(x, n, ratio)
+    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
+    return FixedSplit(x, n, ceil(Int, ratio * n))
+end
+
+function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}; m::Int = 1)
+    n = nobs(x)
+    1 ≤ m ≤ n - 1 || throw(ArgumentError("data cannot be split by $m"))
+    return FixedSplit(x, n, m)
 end
 
 Base.length(r::FixedSplit) = 1
@@ -50,24 +56,30 @@ Base.eltype(r::FixedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
-    k = ceil(Int, r.ratio * r.n)
-    train = getobs(r.x, 1:k)
-    test = getobs(r.x, (k + 1):r.n)
+    train = getobs(r.x, 1:r.m)
+    test = getobs(r.x, (r.m + 1):r.n)
     return (train, test), state + 1
 end
 
 struct RandomSplit{D} <: ResampleMethod
     x::D
     n::Int
-    ratio::Number
+    m::Int
     times::Int
 end
 
 function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}; ratio::Number = 0.8, times::Int = 1)
     n = nobs(x)
-    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be partitioned based on a $ratio ratio"))
+    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
     0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
-    return RandomSplit(x, n, ratio, times)
+    return RandomSplit(x, n, ceil(Int, ratio * n), times)
+end
+
+function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}; m::Int = 1, times::Int = 1)
+    n = nobs(x)
+    1 ≤ m ≤ n - 1 || throw(ArgumentError("data cannot be split by $m"))
+    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
+    return RandomSplit(x, n, m, times)
 end
 
 Base.length(r::RandomSplit) = r.times
@@ -75,10 +87,9 @@ Base.eltype(r::RandomSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > r.times && return nothing
-    k = ceil(Int, r.ratio * r.n)
     inds = shuffle!([1:r.n; ])
-    train = getobs(r.x, inds[1:k])
-    test = getobs(r.x, inds[(k + 1):end])
+    train = getobs(r.x, inds[1:r.m])
+    test = getobs(r.x, inds[(r.m + 1):r.n])
     return (train, test), state + 1
 end
 
