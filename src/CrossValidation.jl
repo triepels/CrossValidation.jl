@@ -103,7 +103,7 @@ end
 
 function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector, m::Int; times::Int = 1)
     n = nobs(x)
-    nobs(y) == n || throw(ArgumentError("data and conditional data should have the same number of observations"))
+    nobs(y) == n || throw(ArgumentError("x and y should have the same number of observations"))
     
     strata = map(s -> findall(y .== s), unique(y))
     for s in strata
@@ -118,7 +118,7 @@ end
 
 function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector, ratio::Number = 0.8; times::Int = 1)
     n = nobs(x)
-    nobs(y) == n || throw(ArgumentError("data and conditional data should have the same number of observations"))
+    nobs(y) == n || throw(ArgumentError("x and y should have the same number of observations"))
     
     strata = map(s -> findall(y .== s), unique(y))
     for s in strata
