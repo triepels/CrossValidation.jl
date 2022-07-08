@@ -222,7 +222,7 @@ struct ForwardChaining{D} <: ResampleMethod
     partial::Bool
 end
 
-function ForwardChaining(x::Union{AbstractArray, Tuple, NamedTuple}; init::Int, test::Int, partial::Bool = true)
+function ForwardChaining(x::Union{AbstractArray, Tuple, NamedTuple}, init::Int, test::Int; partial::Bool = true)
     n = nobs(x)
     1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
     1 ≤ test ≤ n || throw(ArgumentError("invalid test window of $test"))
@@ -254,7 +254,7 @@ struct SlidingWindow{D} <: ResampleMethod
     partial::Bool
 end
 
-function SlidingWindow(x::Union{AbstractArray, Tuple, NamedTuple}; train::Int, test::Int, partial::Bool = true)
+function SlidingWindow(x::Union{AbstractArray, Tuple, NamedTuple}, train::Int, test::Int; partial::Bool = true)
     n = nobs(x)
     1 ≤ train ≤ n || throw(ArgumentError("invalid train window of $train"))
     1 ≤ test ≤ n || throw(ArgumentError("invalid test window of $test"))
