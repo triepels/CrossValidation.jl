@@ -11,7 +11,7 @@ Resample methods:
 * Fixed split
 * Random split (holdout)
 * Stratified split (stratified holdout)
-* K-Fold
+* K-fold
 * Stratified k-fold
 * Forward chaining
 * Sliding window
