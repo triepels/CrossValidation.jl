@@ -283,13 +283,13 @@ _score(x::AbstractArray, model) = score(model, x)
 _score(x::Union{Tuple, NamedTuple}, model) = score(model, x...)
 
 struct ModelValidation{T1,T2}
-    model::Array{T1, 1}
-    score::Array{T2, 1}
+    model::Vector{T1}
+    score::Vector{T2}
 end
 
 struct ParameterSearch{T1,T2}
-    model::Array{T1, 2}
-    score::Array{T2, 2}
+    model::Matrix{T1}
+    score::Matrix{T2}
     final::T1
 end
 
@@ -326,8 +326,8 @@ end
 function crossvalidate(fit::Function, resample::ResampleMethod, search::ExhaustiveSearch; preprocess::Function = nopreprocess, maximize::Bool = true, verbose::Bool = false)
     grid = collect(search)
     n, m = length(resample), length(grid)
-    model = Array{Any, 2}(undef, n, m)
-    score = Array{Any, 2}(undef, n, m)
+    model = Matrix{Any}(undef, n, m)
+    score = Matrix{Any}(undef, n, m)
 
     i = 1
     for (train, test) in resample
