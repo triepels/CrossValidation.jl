@@ -25,13 +25,15 @@ end
 getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
 getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
 
-abstract type ResampleMethod end
-
 restype(x) = restype(typeof(x))
 restype(x::Tuple) = Tuple{map(restype, x)...}
 restype(::Type{T1}) where T1 <: Base.ReshapedArray{T2, N} where {T2, N} = Array{eltype(T1), N}
 restype(::Type{T1}) where T1 <: Base.SubArray{T2, N} where {T2, N} = Array{eltype(T1), N}
 restype(::Type{T}) where T = T
+
+abstract type ResampleMethod end
+
+Base.eltype(r::ResampleMethod) = Tuple{restype(r.x), restype(r.x)}
 
 struct FixedSplit{D} <: ResampleMethod
     x::D
@@ -52,7 +54,6 @@ function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 
 end
 
 Base.length(r::FixedSplit) = 1
-Base.eltype(r::FixedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
@@ -83,7 +84,6 @@ function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number =
 end
 
 Base.length(r::RandomSplit) = r.times
-Base.eltype(r::RandomSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > r.times && return nothing
@@ -132,7 +132,6 @@ function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::Abstract
 end
 
 Base.length(r::StratifiedSplit) = r.times
-Base.eltype(r::StratifiedSplit{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::StratifiedSplit, state = 1)
     state > r.times && return nothing
@@ -162,7 +161,6 @@ function KFold(x::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
 end
 
 Base.length(r::KFold) = r.k
-Base.eltype(r::KFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
     state > r.k && return nothing
@@ -197,7 +195,6 @@ function StratifiedKFold(x::Union{AbstractArray, Tuple, NamedTuple}, y::Abstract
 end
 
 Base.length(r::StratifiedKFold) = r.k
-Base.eltype(r::StratifiedKFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 @propagate_inbounds function Base.iterate(r::StratifiedKFold, state = 1)
     state > r.k && return nothing
@@ -242,8 +239,6 @@ function Base.length(r::ForwardChaining)
     end
 end
 
-Base.eltype(r::ForwardChaining{D}) where D = Tuple{restype(r.x), restype(r.x)}
-
 @propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
     state > length(r) && return nothing
     train = getobs(r.x, 1:(r.init + (state - 1) * r.test))
@@ -275,8 +270,6 @@ function Base.length(r::SlidingWindow)
         floor(Int, l)
     end
 end
-
-Base.eltype(r::SlidingWindow{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
 function Base.iterate(r::SlidingWindow, state = 1)
     state > length(r) && return nothing
