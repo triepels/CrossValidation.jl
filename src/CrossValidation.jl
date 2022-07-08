@@ -164,7 +164,7 @@ end
 Base.length(r::KFold) = r.k
 Base.eltype(r::KFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
-Base.@propagate_inbounds function Base.iterate(r::KFold, state = 1)
+@propagate_inbounds function Base.iterate(r::KFold, state = 1)
     state > r.k && return nothing
     if state == 1
         shuffle!(r.inds)
@@ -199,7 +199,7 @@ end
 Base.length(r::StratifiedKFold) = r.k
 Base.eltype(r::StratifiedKFold{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
-Base.@propagate_inbounds function Base.iterate(r::StratifiedKFold, state = 1)
+@propagate_inbounds function Base.iterate(r::StratifiedKFold, state = 1)
     state > r.k && return nothing
     inds = sizehint!(Int[], ceil(Int, (1 / r.k) * r.n))
     for s in r.strata
@@ -244,7 +244,7 @@ end
 
 Base.eltype(r::ForwardChaining{D}) where D = Tuple{restype(r.x), restype(r.x)}
 
-function Base.iterate(r::ForwardChaining, state = 1)
+@propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
     state > length(r) && return nothing
     train = getobs(r.x, 1:(r.init + (state - 1) * r.test))
     test = getobs(r.x, (r.init + (state - 1) * r.test + 1):min(r.init + state * r.test, r.n))
