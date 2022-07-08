@@ -4,7 +4,7 @@ using Base: @propagate_inbounds, Iterators.ProductIterator
 using Random: shuffle!
 using Distributed: pmap
 
-export ResampleMethod, FixedSplit, RandomSplit, StratifiedSplit, KFold, StratifiedKFold,
+export ResampleMethod, FixedSplit, RandomSplit, StratifiedSplit, KFold, StratifiedKFold, ForwardChaining, SlidingWindow,
        ExhaustiveSearch,
        ModelValidation, ParameterTuning, crossvalidate,
        predict, score
@@ -248,6 +248,40 @@ Base.eltype(r::ForwardChaining{D}) where D = Tuple{restype(r.x), restype(r.x)}
     state > length(r) && return nothing
     train = getobs(r.x, 1:(r.init + (state - 1) * r.test))
     test = getobs(r.x, (r.init + (state - 1) * r.test + 1):min(r.init + state * r.test, r.n))
+    return (train, test), state + 1
+end
+
+struct SlidingWindow{D} <: ResampleMethod
+    x::D
+    n::Int
+    train::Int
+    test::Int
+    partial::Bool
+end
+
+function SlidingWindow(x::Union{AbstractArray, Tuple, NamedTuple}; train::Int, test::Int, partial::Bool = true)
+    n = nobs(x)
+    1 ≤ train ≤ n || throw(ArgumentError("invalid train window of $train"))
+    1 ≤ test ≤ n || throw(ArgumentError("invalid test window of $test"))
+    train + test ≤ n || throw(ArgumentError("train and test window exceed the number of data observations"))
+    return SlidingWindow(x, n, train, test, partial)
+end
+
+function Base.length(r::SlidingWindow)
+    l = (r.n - r.train) / r.test
+    if r.partial
+        ceil(Int, l)
+    else
+        floor(Int, l)
+    end
+end
+
+Base.eltype(r::SlidingWindow{D}) where D = Tuple{restype(r.x), restype(r.x)}
+
+function Base.iterate(r::SlidingWindow, state = 1)
+    state > length(r) && return nothing
+    train = getobs(r.x, (1 + (state - 1) * r.test):(r.train + (state - 1) * r.test))
+    test = getobs(r.x, (r.train + (state - 1) * r.test + 1):min(r.train + state * r.test, r.n))
     return (train, test), state + 1
 end
 
