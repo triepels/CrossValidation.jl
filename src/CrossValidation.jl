@@ -138,7 +138,7 @@ Base.length(r::StratifiedSplit) = r.times
     inds = sizehint!(Int[], r.m)
     for s in r.strata
         shuffle!(s)
-        m = round(Int, length(s) / r.n * r.m)
+        m = min(ceil(Int, length(s) / r.n * r.m), r.m - length(inds))
         append!(inds, s[1:m])
     end
     shuffle!(inds)
