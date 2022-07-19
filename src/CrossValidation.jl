@@ -218,20 +218,20 @@ struct ForwardChaining{D} <: ResampleMethod
     x::D
     n::Int
     init::Int
-    test::Int
+    out::Int
     partial::Bool
 end
 
-function ForwardChaining(x::Union{AbstractArray, Tuple, NamedTuple}, init::Int, test::Int; partial::Bool = true)
+function ForwardChaining(x::Union{AbstractArray, Tuple, NamedTuple}, init::Int, out::Int; partial::Bool = true)
     n = nobs(x)
     1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
-    1 ≤ test ≤ n || throw(ArgumentError("invalid test window of $test"))
-    init + test ≤ n || throw(ArgumentError("initial and test window exceed the number of data observations"))
-    return ForwardChaining(x, n, init, test, partial)
+    1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
+    init + out ≤ n || throw(ArgumentError("initial and out-of-sample window exceed the number of data observations"))
+    return ForwardChaining(x, n, init, out, partial)
 end
 
 function Base.length(r::ForwardChaining)
-    l = (r.n - r.init) / r.test
+    l = (r.n - r.init) / r.out
     if r.partial
         ceil(Int, l)
     else
@@ -241,29 +241,29 @@ end
 
 @propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.x, 1:(r.init + (state - 1) * r.test))
-    test = getobs(r.x, (r.init + (state - 1) * r.test + 1):min(r.init + state * r.test, r.n))
+    train = getobs(r.x, 1:(r.init + (state - 1) * r.out))
+    test = getobs(r.x, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, r.n))
     return (train, test), state + 1
 end
 
 struct SlidingWindow{D} <: ResampleMethod
     x::D
     n::Int
-    train::Int
-    test::Int
+    window::Int
+    out::Int
     partial::Bool
 end
 
-function SlidingWindow(x::Union{AbstractArray, Tuple, NamedTuple}, train::Int, test::Int; partial::Bool = true)
+function SlidingWindow(x::Union{AbstractArray, Tuple, NamedTuple}, window::Int, out::Int; partial::Bool = true)
     n = nobs(x)
-    1 ≤ train ≤ n || throw(ArgumentError("invalid train window of $train"))
-    1 ≤ test ≤ n || throw(ArgumentError("invalid test window of $test"))
-    train + test ≤ n || throw(ArgumentError("train and test window exceed the number of data observations"))
-    return SlidingWindow(x, n, train, test, partial)
+    1 ≤ window ≤ n || throw(ArgumentError("invalid sliding window of $window"))
+    1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
+    window + out ≤ n || throw(ArgumentError("sliding and out-of-sample window exceed the number of data observations"))
+    return SlidingWindow(x, n, window, out, partial)
 end
 
 function Base.length(r::SlidingWindow)
-    l = (r.n - r.train) / r.test
+    l = (r.n - r.window) / r.out
     if r.partial
         ceil(Int, l)
     else
@@ -273,8 +273,8 @@ end
 
 function Base.iterate(r::SlidingWindow, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.x, (1 + (state - 1) * r.test):(r.train + (state - 1) * r.test))
-    test = getobs(r.x, (r.train + (state - 1) * r.test + 1):min(r.train + state * r.test, r.n))
+    train = getobs(r.x, (1 + (state - 1) * r.out):(r.window + (state - 1) * r.out))
+    test = getobs(r.x, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, r.n))
     return (train, test), state + 1
 end
 
