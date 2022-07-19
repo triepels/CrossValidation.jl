@@ -143,7 +143,7 @@ Base.length(r::StratifiedSplit) = r.times
     end
     shuffle!(inds)
     train = getobs(r.x, inds)
-    test = getobs(r.x, setdiff(1:r.n, inds))
+    test = getobs(r.x, shuffle!(setdiff(1:r.n, inds)))
     return (train, test), state + 1
 end
 
@@ -209,7 +209,7 @@ Base.length(r::StratifiedKFold) = r.k
         append!(inds, s[fold])
     end
     shuffle!(inds)
-    train = getobs(r.x, setdiff(1:r.n, inds))
+    train = getobs(r.x, shuffle!(setdiff(1:r.n, inds)))
     test = getobs(r.x, inds)
     return (train, test), state + 1
 end
