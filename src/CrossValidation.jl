@@ -271,7 +271,7 @@ function Base.length(r::SlidingWindow)
     end
 end
 
-function Base.iterate(r::SlidingWindow, state = 1)
+@propagate_inbounds function Base.iterate(r::SlidingWindow, state = 1)
     state > length(r) && return nothing
     train = getobs(r.x, (1 + (state - 1) * r.out):(r.window + (state - 1) * r.out))
     test = getobs(r.x, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, r.n))
