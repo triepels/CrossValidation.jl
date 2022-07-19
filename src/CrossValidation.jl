@@ -25,11 +25,10 @@ end
 getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
 getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
 
-restype(x) = restype(typeof(x))
 restype(x::Tuple) = Tuple{map(restype, x)...}
-restype(::Type{T1}) where T1 <: Base.ReshapedArray{T2, N} where {T2, N} = Array{T2, N}
-restype(::Type{T1}) where T1 <: Base.SubArray{T2, N} where {T2, N} = Array{T2, N}
-restype(::Type{T}) where T = T
+restype(x::NamedTuple) = NamedTuple{keys(x), Tuple{map(restype, x)...}}
+restype(x::AbstractArray) = Array{eltype(x), ndims(x)}
+restype(x::Any) = typeof(x)
 
 abstract type ResampleMethod end
 
