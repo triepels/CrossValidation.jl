@@ -27,8 +27,8 @@ getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
 
 restype(x) = restype(typeof(x))
 restype(x::Tuple) = Tuple{map(restype, x)...}
-restype(::Type{T1}) where T1 <: Base.ReshapedArray{T2, N} where {T2, N} = Array{eltype(T1), N}
-restype(::Type{T1}) where T1 <: Base.SubArray{T2, N} where {T2, N} = Array{eltype(T1), N}
+restype(::Type{T1}) where T1 <: Base.ReshapedArray{T2, N} where {T2, N} = Array{T2, N}
+restype(::Type{T1}) where T1 <: Base.SubArray{T2, N} where {T2, N} = Array{T2, N}
 restype(::Type{T}) where T = T
 
 abstract type ResampleMethod end
