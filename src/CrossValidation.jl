@@ -231,11 +231,7 @@ end
 
 function Base.length(r::ForwardChaining)
     l = (r.n - r.init) / r.out
-    if r.partial
-        ceil(Int, l)
-    else
-        floor(Int, l)
-    end
+    return r.partial ? ceil(Int, l) : floor(Int, l)
 end
 
 @propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
@@ -263,11 +259,7 @@ end
 
 function Base.length(r::SlidingWindow)
     l = (r.n - r.window) / r.out
-    if r.partial
-        ceil(Int, l)
-    else
-        floor(Int, l)
-    end
+    return r.partial ? ceil(Int, l) : floor(Int, l)
 end
 
 @propagate_inbounds function Base.iterate(r::SlidingWindow, state = 1)
