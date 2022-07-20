@@ -142,8 +142,7 @@ Base.length(r::StratifiedSplit) = r.times
         m = ceil(Int, length(s) * r.ratio)
         append!(inds, s[1:m])
     end
-    shuffle!(inds)
-    train = getobs(r.x, inds)
+    train = getobs(r.x, shuffle!(inds))
     test = getobs(r.x, shuffle!(setdiff(1:r.n, inds)))
     return (train, test), state + 1
 end
@@ -209,9 +208,8 @@ Base.length(r::StratifiedKFold) = r.k
         fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
         append!(inds, s[fold])
     end
-    shuffle!(inds)
     train = getobs(r.x, shuffle!(setdiff(1:r.n, inds)))
-    test = getobs(r.x, inds)
+    test = getobs(r.x, shuffle!(inds))
     return (train, test), state + 1
 end
 
