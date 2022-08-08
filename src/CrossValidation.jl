@@ -32,240 +32,143 @@ restype(x::Any) = typeof(x)
 
 abstract type ResampleMethod end
 
-Base.eltype(r::ResampleMethod) = Tuple{restype(r.x), restype(r.x)}
+Base.eltype(r::ResampleMethod) = Tuple{restype(r.data), restype(r.data)}
 
 struct FixedSplit{D} <: ResampleMethod
-    x::D
-    n::Int
+    data::D
+    nobs::Int
     ratio::Number
 end
 
-function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
-    n = nobs(x)
+function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
+    n = nobs(data)
     1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return FixedSplit(x, n, ratio)
+    return FixedSplit(data, n, ratio)
 end
 
-function FixedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
-    n = nobs(x)
+function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
+    n = nobs(data)
     1 ≤ m ≤ n - 1 || throw(ArgumentError("data cannot be split by $m"))
-    return FixedSplit(x, n, m / n)
+    return FixedSplit(data, n, m / n)
 end
 
 Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
-    m = ceil(Int, r.ratio * r.n)
-    train = getobs(r.x, 1:m)
-    test = getobs(r.x, (m + 1):r.n)
+    m = ceil(Int, r.ratio * r.nobs)
+    train = getobs(r.data, 1:m)
+    test = getobs(r.data, (m + 1):r.nobs)
     return (train, test), state + 1
 end
 
 struct RandomSplit{D} <: ResampleMethod
-    x::D
-    n::Int
+    data::D
+    nobs::Int
     ratio::Number
-    times::Int
+    perm::Vector{Int}
 end
 
-function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8; times::Int = 1)
-    n = nobs(x)
+function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
+    n = nobs(data)
     1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
-    return RandomSplit(x, n, ratio, times)
+    return RandomSplit(data, n, ratio, shuffle!([1:n;]))
 end
 
-function RandomSplit(x::Union{AbstractArray, Tuple, NamedTuple}, m::Int; times::Int = 1)
-    n = nobs(x)
+function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
+    n = nobs(data)
     1 ≤ m ≤ n - 1 || throw(ArgumentError("data cannot be split by $m"))
-    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
-    return RandomSplit(x, n, m / n, times)
+    return RandomSplit(data, n, m / n, shuffle!([1:n;]))
 end
 
-Base.length(r::RandomSplit) = r.times
+Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
-    state > r.times && return nothing
-    inds = shuffle!([1:r.n; ])
-    m = ceil(Int, r.ratio * r.n)
-    train = getobs(r.x, inds[1:m])
-    test = getobs(r.x, inds[(m + 1):r.n])
-    return (train, test), state + 1
-end
-
-struct StratifiedSplit{D} <: ResampleMethod
-    x::D
-    n::Int
-    ratio::Number
-    times::Int
-    strata::Vector{Vector{Int}}
-end
-
-function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector, ratio::Number = 0.8; times::Int = 1)
-    n = nobs(x)
-    nobs(y) == n || throw(ArgumentError("x and y should have the same number of observations"))
-    
-    strata = map(s -> findall(y .== s), unique(y))
-    for s in strata
-        l = length(s)
-        1 ≤ l * ratio ≤ l - 1 || throw(ArgumentError("unable to stratify data based on a $ratio ratio"))
-    end
-
-    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
-
-    return StratifiedSplit(x, n, ratio, times, strata)
-end
-
-function StratifiedSplit(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector, m::Int; times::Int = 1)
-    n = nobs(x)
-    nobs(y) == n || throw(ArgumentError("x and y should have the same number of observations"))
-    
-    strata = map(s -> findall(y .== s), unique(y))
-    for s in strata
-        l = length(s)
-        1 ≤ l / n * m ≤ l - 1 || throw(ArgumentError("unable to stratify data by $m"))
-    end
-
-    0 < times || throw(ArgumentError("unable to repeat resampling $times times"))
-
-    return StratifiedSplit(x, n, m / n, times, strata)
-end
-
-Base.length(r::StratifiedSplit) = r.times
-
-@propagate_inbounds function Base.iterate(r::StratifiedSplit, state = 1)
-    state > r.times && return nothing
-    inds = sizehint!(Int[], ceil(Int, r.ratio * r.n))
-    for s in r.strata
-        shuffle!(s)
-        m = ceil(Int, length(s) * r.ratio)
-        append!(inds, s[1:m])
-    end
-    train = getobs(r.x, shuffle!(inds))
-    test = getobs(r.x, shuffle!(setdiff(1:r.n, inds)))
+    state > 1 && return nothing
+    m = ceil(Int, r.ratio * r.nobs)
+    train = getobs(r.data, r.perm[1:m])
+    test = getobs(r.data, r.perm[(m + 1):r.nobs])
     return (train, test), state + 1
 end
 
 struct KFold{D} <: ResampleMethod
-    x::D
-    n::Int
-    k::Int
-    inds::Vector{Int}
+    data::D
+    nobs::Int
+    folds::Int
+    perm::Vector{Int}
 end
 
-function KFold(x::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
-    n = nobs(x)
+function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
+    n = nobs(data)
     1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
-    return KFold(x, n, k, [1:n;])
+    return KFold(data, n, k, shuffle!([1:n;]))
 end
 
-Base.length(r::KFold) = r.k
+Base.length(r::KFold) = r.folds
 
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
-    state > r.k && return nothing
-    if state == 1
-        shuffle!(r.inds)
-    end
-    m = mod(r.n, r.k)
-    w = floor(Int, r.n / r.k)
+    state > r.folds && return nothing
+    m = mod(r.nobs, r.folds)
+    w = floor(Int, r.nobs / r.folds)
     fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
-    train = getobs(r.x, r.inds[1:end .∉ Ref(fold)])
-    test = getobs(r.x, r.inds[fold])
-    return (train, test), state + 1
-end
-
-struct StratifiedKFold{D} <: ResampleMethod
-    x::D
-    n::Int
-    k::Int
-    strata::Vector{Vector{Int}}
-end
-
-function StratifiedKFold(x::Union{AbstractArray, Tuple, NamedTuple}, y::AbstractVector; k::Int = 10)
-    n = nobs(x)
-    nobs(y) == n || throw(ArgumentError("data should have the same number of observations"))
-
-    strata = map(s -> findall(y .== s), unique(y))
-    for s in strata
-        length(s) ≥ k || throw(ArgumentError("not all strata can be partitioned into $k folds"))
-    end
-
-    return StratifiedKFold(x, n, k, strata)
-end
-
-Base.length(r::StratifiedKFold) = r.k
-
-@propagate_inbounds function Base.iterate(r::StratifiedKFold, state = 1)
-    state > r.k && return nothing
-    inds = sizehint!(Int[], ceil(Int, (1 / r.k) * r.n))
-    for s in r.strata
-        if state == 1
-            shuffle!(s)
-        end
-        m = mod(length(s), r.k)
-        w = floor(Int, length(s) / r.k)
-        fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
-        append!(inds, s[fold])
-    end
-    train = getobs(r.x, shuffle!(setdiff(1:r.n, inds)))
-    test = getobs(r.x, shuffle!(inds))
+    train = getobs(r.data, r.perm[1:end .∉ Ref(fold)])
+    test = getobs(r.data, r.perm[fold])
     return (train, test), state + 1
 end
 
 struct ForwardChaining{D} <: ResampleMethod
-    x::D
-    n::Int
+    data::D
+    nobs::Int
     init::Int
     out::Int
     partial::Bool
 end
 
-function ForwardChaining(x::Union{AbstractArray, Tuple, NamedTuple}, init::Int, out::Int; partial::Bool = true)
-    n = nobs(x)
+function ForwardChaining(data::Union{AbstractArray, Tuple, NamedTuple}, init::Int, out::Int; partial::Bool = true)
+    n = nobs(data)
     1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
     1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
     init + out ≤ n || throw(ArgumentError("initial and out-of-sample window exceed the number of data observations"))
-    return ForwardChaining(x, n, init, out, partial)
+    return ForwardChaining(data, n, init, out, partial)
 end
 
 function Base.length(r::ForwardChaining)
-    l = (r.n - r.init) / r.out
+    l = (r.nobs - r.init) / r.out
     return r.partial ? ceil(Int, l) : floor(Int, l)
 end
 
 @propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.x, 1:(r.init + (state - 1) * r.out))
-    test = getobs(r.x, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, r.n))
+    train = getobs(r.data, 1:(r.init + (state - 1) * r.out))
+    test = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, r.nobs))
     return (train, test), state + 1
 end
 
 struct SlidingWindow{D} <: ResampleMethod
-    x::D
-    n::Int
+    data::D
+    nobs::Int
     window::Int
     out::Int
     partial::Bool
 end
 
-function SlidingWindow(x::Union{AbstractArray, Tuple, NamedTuple}, window::Int, out::Int; partial::Bool = true)
-    n = nobs(x)
+function SlidingWindow(data::Union{AbstractArray, Tuple, NamedTuple}, window::Int, out::Int; partial::Bool = true)
+    n = nobs(data)
     1 ≤ window ≤ n || throw(ArgumentError("invalid sliding window of $window"))
     1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
     window + out ≤ n || throw(ArgumentError("sliding and out-of-sample window exceed the number of data observations"))
-    return SlidingWindow(x, n, window, out, partial)
+    return SlidingWindow(data, n, window, out, partial)
 end
 
 function Base.length(r::SlidingWindow)
-    l = (r.n - r.window) / r.out
+    l = (r.nobs - r.window) / r.out
     return r.partial ? ceil(Int, l) : floor(Int, l)
 end
 
 @propagate_inbounds function Base.iterate(r::SlidingWindow, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.x, (1 + (state - 1) * r.out):(r.window + (state - 1) * r.out))
-    test = getobs(r.x, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, r.n))
+    train = getobs(r.data, (1 + (state - 1) * r.out):(r.window + (state - 1) * r.out))
+    test = getobs(r.data, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, r.nobs))
     return (train, test), state + 1
 end
 
@@ -377,7 +280,7 @@ function crossvalidate(fit::Function, resample::ResampleMethod, search::Exhausti
         idx = argmin(sum(score, dims=1) ./ n)[2]
     end
 
-    final = _fit(preprocess(resample.x), fit, grid[idx])
+    final = _fit(preprocess(resample.data), fit, grid[idx])
 
     if verbose
         @info "Completed fitting final model"

@@ -25,9 +25,7 @@ search = ExhaustiveSearch(a=1:2, b=3:4)
 
 cv = crossvalidate(mymodel, FixedSplit(x), search)
 cv = crossvalidate(mymodel, RandomSplit(x), search)
-cv = crossvalidate(mymodel, StratifiedSplit(x, y), search)
 cv = crossvalidate(mymodel, KFold(x), search)
-cv = crossvalidate(mymodel, StratifiedKFold(x, y), search)
 cv = crossvalidate(mymodel, ForwardChaining(x, 40, 10), search)
 cv = crossvalidate(mymodel, SlidingWindow(x, 40, 10), search)
 
