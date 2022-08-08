@@ -19,7 +19,6 @@ function score(model::MyModel, x::AbstractArray)
 end
 
 x = rand(2, 100)
-y = rand(100) .≥ 0.5
 
 search = ExhaustiveSearch(a=1:2, b=3:4)
 
