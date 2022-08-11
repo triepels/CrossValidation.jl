@@ -51,6 +51,7 @@ function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     return FixedSplit(data, n, m / n)
 end
 
+data(r::FixedSplit) = r.data
 Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
@@ -80,6 +81,7 @@ function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     return RandomSplit(data, n, m / n, shuffle!([1:n;]))
 end
 
+data(r::RandomSplit) = r.data
 Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
@@ -103,6 +105,7 @@ function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
     return KFold(data, n, k, shuffle!([1:n;]))
 end
 
+data(r::KFold) = r.data
 Base.length(r::KFold) = r.folds
 
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
@@ -131,6 +134,8 @@ function ForwardChaining(data::Union{AbstractArray, Tuple, NamedTuple}, init::In
     return ForwardChaining(data, n, init, out, partial)
 end
 
+data(r::ForwardChaining) = r.data
+
 function Base.length(r::ForwardChaining)
     l = (r.nobs - r.init) / r.out
     return r.partial ? ceil(Int, l) : floor(Int, l)
@@ -158,6 +163,8 @@ function SlidingWindow(data::Union{AbstractArray, Tuple, NamedTuple}, window::In
     window + out ≤ n || throw(ArgumentError("sliding and out-of-sample window exceed the number of data observations"))
     return SlidingWindow(data, n, window, out, partial)
 end
+
+data(r::SlidingWindow) = r.data
 
 function Base.length(r::SlidingWindow)
     l = (r.nobs - r.window) / r.out
@@ -284,9 +291,10 @@ function _eval(f, train, test, search, preprocess)
 end
 
 function search(f::Function, resample::ResampleMethod, search::SearchMethod; preprocess::Function = nopreprocess, maximize::Bool = true)
+    length(search) ≥ 1 || throw(ArgumentError("unable to search the search space"))
     scores = mean(x -> _eval(f, x..., search, preprocess), resample)
     best = maximize ? argmax(scores) : argmin(scores)
-    return _fit(f, preprocess(resample.data), search[best])
+    return _fit(f, preprocess(data(resample)), search[best])
 end
 
 end

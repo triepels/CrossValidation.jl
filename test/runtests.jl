@@ -1,4 +1,5 @@
 using CrossValidation
+
 import CrossValidation: loss
 
 struct MyModel
