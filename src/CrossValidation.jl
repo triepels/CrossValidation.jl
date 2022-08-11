@@ -4,9 +4,9 @@ using Base: @propagate_inbounds
 using Random: shuffle!
 using Distributed: pmap
 
-export ResampleMethod, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow,
-       SearchSpace, SearchMethod, ExhaustiveSearch, RandomSearch,
-       loss, cv, search
+export Resampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow,
+       SearchSpace, Optimizer, ExhaustiveSearch, RandomSearch,
+       loss, cv, optimize
 
 nobs(x::AbstractArray) = size(x)[end]
 
@@ -29,11 +29,11 @@ restype(x::NamedTuple) = NamedTuple{keys(x), Tuple{map(restype, x)...}}
 restype(x::AbstractArray) = Array{eltype(x), ndims(x)}
 restype(x::Any) = typeof(x)
 
-abstract type ResampleMethod end
+abstract type Resampler end
 
-Base.eltype(r::ResampleMethod) = Tuple{restype(r.data), restype(r.data)}
+Base.eltype(r::Resampler) = Tuple{restype(r.data), restype(r.data)}
 
-struct FixedSplit{D} <: ResampleMethod
+struct FixedSplit{D} <: Resampler
     data::D
     nobs::Int
     ratio::Number
@@ -62,7 +62,7 @@ Base.length(r::FixedSplit) = 1
     return (train, test), state + 1
 end
 
-struct RandomSplit{D} <: ResampleMethod
+struct RandomSplit{D} <: Resampler
     data::D
     nobs::Int
     ratio::Number
@@ -92,7 +92,7 @@ Base.length(r::RandomSplit) = 1
     return (train, test), state + 1
 end
 
-struct KFold{D} <: ResampleMethod
+struct KFold{D} <: Resampler
     data::D
     nobs::Int
     folds::Int
@@ -118,7 +118,7 @@ Base.length(r::KFold) = r.folds
     return (train, test), state + 1
 end
 
-struct ForwardChaining{D} <: ResampleMethod
+struct ForwardChaining{D} <: Resampler
     data::D
     nobs::Int
     init::Int
@@ -148,7 +148,7 @@ end
     return (train, test), state + 1
 end
 
-struct SlidingWindow{D} <: ResampleMethod
+struct SlidingWindow{D} <: Resampler
     data::D
     nobs::Int
     window::Int
@@ -213,14 +213,14 @@ end
     return NamedTuple{names}(map(getindex, s.args, I))
 end
 
-abstract type SearchMethod end
+abstract type Optimizer end
 
-@propagate_inbounds function Base.iterate(s::SearchMethod, state = 1)
+@propagate_inbounds function Base.iterate(s::Optimizer, state = 1)
     state > length(s) && return nothing
     return s[state], state + 1
 end
 
-struct ExhaustiveSearch <: SearchMethod
+struct ExhaustiveSearch <: Optimizer
     space::SearchSpace
 end
 
@@ -232,7 +232,7 @@ Base.length(s::ExhaustiveSearch) = length(s.space)
     return @inbounds s.space[i]
 end
 
-struct RandomSearch <: SearchMethod
+struct RandomSearch <: Optimizer
     space::SearchSpace
     cand::Vector{Int}
 end
@@ -278,23 +278,23 @@ function _eval(f, train, test, preprocess)
     return loss(model, test)
 end
 
-function cv(f::Function, resample::ResampleMethod; preprocess::Function = nopreprocess)
-    return map(x -> _eval(f, x..., preprocess), resample)
+function cv(f::Function, res::Resampler; preprocess::Function = nopreprocess)
+    return map(x -> _eval(f, x..., preprocess), res)
 end
 
 mean(f, itr) = sum(f, itr) / length(itr)
 
-function _eval(f, train, test, search, preprocess)
+function _eval(f, train, test, opt, preprocess)
     train, test = preprocess(train, test)
-    model = pmap(x -> _fit(f, train, x), search)
+    model = pmap(x -> _fit(f, train, x), opt)
     return map(x -> loss(x, test), model)
 end
 
-function search(f::Function, resample::ResampleMethod, search::SearchMethod; preprocess::Function = nopreprocess, maximize::Bool = true)
-    length(search) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    scores = mean(x -> _eval(f, x..., search, preprocess), resample)
+function optimize(f::Function, res::Resampler, opt::Optimizer; preprocess::Function = nopreprocess, maximize::Bool = true)
+    length(opt) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    scores = mean(x -> _eval(f, x..., opt, preprocess), res)
     best = maximize ? argmax(scores) : argmin(scores)
-    return _fit(f, preprocess(data(resample)), search[best])
+    return _fit(f, preprocess(data(res)), opt[best])
 end
 
 end
