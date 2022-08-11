@@ -1,13 +1,12 @@
 module CrossValidation
 
-using Base: @propagate_inbounds, Iterators.ProductIterator
+using Base: @propagate_inbounds
 using Random: shuffle!
 using Distributed: pmap
 
-export ResampleMethod, FixedSplit, RandomSplit, StratifiedSplit, KFold, StratifiedKFold, ForwardChaining, SlidingWindow,
-       ExhaustiveSearch,
-       ModelValidation, ParameterTuning, crossvalidate,
-       predict, score
+export ResampleMethod, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow,
+       SearchSpace, SearchMethod, ExhaustiveSearch, RandomSearch,
+       loss, cv, search
 
 nobs(x::AbstractArray) = size(x)[end]
 
@@ -172,129 +171,122 @@ end
     return (train, test), state + 1
 end
 
-struct ExhaustiveSearch
-    keys::Tuple
-    iter::ProductIterator
+struct SearchSpace{names, T<:Tuple}
+    args::T
 end
 
-function ExhaustiveSearch(; args...)
-    return ExhaustiveSearch(keys(args), Base.product(values(args)...))
+function SearchSpace{names}(args::Vararg) where names
+    if length(args) != length(names::Tuple)
+        throw(ArgumentError("argument names and values must have matching lengths"))
+    end
+    return SearchSpace{names, typeof(args)}(args)
 end
 
-Base.length(s::ExhaustiveSearch) = length(s.iter)
-Base.eltype(s::ExhaustiveSearch) = NamedTuple{s.keys, eltype(s.iter)}
+Base.eltype(::Type{SearchSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
+Base.length(s::SearchSpace) = prod(length, s.args)
 
-function Base.iterate(s::ExhaustiveSearch)
-    (item, state) = iterate(s.iter)
-    return (NamedTuple{s.keys}(item), state)
+Base.firstindex(s::SearchSpace) = 1
+Base.lastindex(s::SearchSpace) = length(s)
+
+Base.size(s::SearchSpace) = map(length, s.args)
+
+function Base.size(s::SearchSpace, d::Integer)
+    @boundscheck d < 1 && throw(DimensionMismatch("dimension out of range"))
+    return d > length(s.args) ? 1 : length(s.args[d])
 end
 
-function Base.iterate(s::ExhaustiveSearch, state)
-    next = iterate(s.iter, state)
-    next === nothing && return nothing
-    return (NamedTuple{s.keys}(next[1]), next[2])
+@inline function Base.getindex(s::SearchSpace{names, T}, i::Int) where {names, T}
+    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
+    strides = (1, cumprod(map(length, Base.front(s.args)))...)
+    return NamedTuple{names}(map(getindex, s.args, mod.((i - 1) .÷ strides, size(s)) .+ 1))
 end
 
-_fit(x::AbstractArray, fit) = fit(x)
-_fit(x::Union{Tuple, NamedTuple}, fit) = fit(x...)
-_fit(x::AbstractArray, fit, args) = fit(x; args...)
-_fit(x::Union{Tuple, NamedTuple}, fit, args) = fit(x...; args...)
-
-_score(x::AbstractArray, model) = score(model, x)
-_score(x::Union{Tuple, NamedTuple}, model) = score(model, x...)
-
-struct ModelValidation{T1,T2}
-    model::Vector{T1}
-    score::Vector{T2}
+@inline function Base.getindex(s::SearchSpace{names, T}, I::Vararg{Int, N}) where {names, T, N}
+    @boundscheck length(I) == length(s.args) && all(1 .≤ I .≤ size(s)) || throw(BoundsError(s, I))
+    return NamedTuple{names}(map(getindex, s.args, I))
 end
 
-struct ParameterSearch{T1,T2}
-    model::Matrix{T1}
-    score::Matrix{T2}
-    final::T1
+abstract type SearchMethod end
+
+@propagate_inbounds function Base.iterate(s::SearchMethod, state = 1)
+    state > length(s) && return nothing
+    return s[state], state + 1
+end
+
+struct ExhaustiveSearch <: SearchMethod
+    space::SearchSpace
+end
+
+Base.eltype(s::ExhaustiveSearch) = eltype(s.space)
+Base.length(s::ExhaustiveSearch) = length(s.space)
+
+@inline function Base.getindex(s::ExhaustiveSearch, i::Int)
+    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
+    return @inbounds s.space[i]
+end
+
+struct RandomSearch <: SearchMethod
+    space::SearchSpace
+    cand::Vector{Int}
+end
+
+function RandomSearch(space::SearchSpace, n::Int = 1)
+    m = length(space)
+    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from search space"))
+    cand = sizehint!(Int[], n)
+    for _ in 1:n
+        c = rand(1:m)
+        while c in cand
+            c = rand(1:m)
+        end
+        push!(cand, c)
+    end
+    return RandomSearch(space, cand)
+end
+
+Base.eltype(s::RandomSearch) = eltype(s.space)
+Base.length(s::RandomSearch) = length(s.cand)
+
+@inline function Base.getindex(s::RandomSearch, i::Int)
+    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
+    return @inbounds s.space[s.cand[i]]
 end
 
 nopreprocess(train) = train
 nopreprocess(train, test) = train, test
 
-function crossvalidate(fit::Function, resample::ResampleMethod; preprocess::Function = nopreprocess, verbose::Bool = false)
-    n = length(resample)
-    model = Vector{Any}(undef, n)
-    score = Vector{Any}(undef, n)
+_fit(f, x::AbstractArray) = f(x)
+_fit(f, x::Union{Tuple, NamedTuple}) = f(x...)
+_fit(f, x::AbstractArray, args) = f(x; args...)
+_fit(f, x::Union{Tuple, NamedTuple}, args) = f(x...; args...)
 
-    i = 1
-    for (train, test) in resample
-        train, test = preprocess(train, test)
+_loss(model, x::AbstractArray) = loss(model, x)
+_loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
-        model[i] = _fit(train, fit)
-        score[i] = _score(test, model[i])
+loss(model, x) = throw(ErrorException("unable to dispatch on loss function"))
 
-        if i == 1
-            model = convert(Vector{typeof(model[1])}, model)
-            score = convert(Vector{typeof(score[1])}, score)
-        end
-
-        if verbose
-            @info "Completed iteration $i of $n"
-        end
-
-        i = i + 1
-    end
-
-    return ModelValidation(model, score)
+function _eval(f, train, test, preprocess)
+    train, test = preprocess(train, test)
+    model = _fit(f, train)
+    return loss(model, test)
 end
 
-function crossvalidate(fit::Function, resample::ResampleMethod, search::ExhaustiveSearch; preprocess::Function = nopreprocess, maximize::Bool = true, verbose::Bool = false)
-    grid = collect(search)
-    n, m = length(resample), length(grid)
-    model = Matrix{Any}(undef, n, m)
-    score = Matrix{Any}(undef, n, m)
-
-    i = 1
-    for (train, test) in resample
-        train, test = preprocess(train, test)
-
-        model[i,:] = pmap((args) -> _fit(train, fit, args), grid)
-        score[i,:] = map((model) -> _score(test, model), model[i,:])
-
-        if i == 1
-            model = convert(Array{typeof(model[1])}, model)
-            score = convert(Array{typeof(score[1])}, score)
-        end
-
-        if verbose
-            if maximize
-                best = max(score[i,:]...)
-            else
-                best = min(score[i,:]...)
-            end
-            @info "Completed iteration $i of $n"
-        end
-
-        i = i + 1
-    end
-
-    if maximize
-        idx = argmax(sum(score, dims=1) ./ n)[2]
-    else
-        idx = argmin(sum(score, dims=1) ./ n)[2]
-    end
-
-    final = _fit(preprocess(resample.data), fit, grid[idx])
-
-    if verbose
-        @info "Completed fitting final model"
-    end
-
-    return ParameterSearch(model, score, final)
+function cv(f::Function, resample::ResampleMethod; preprocess::Function = nopreprocess)
+    return map(x -> _eval(f, x..., preprocess), resample)
 end
 
-function predict(cv::ParameterSearch, kwargs...)
-    return predict(cv.final, kwargs...)
+mean(f, itr) = sum(f, itr) / length(itr)
+
+function _eval(f, train, test, search, preprocess)
+    train, test = preprocess(train, test)
+    model = pmap(x -> _fit(f, train, x), search)
+    return map(x -> loss(x, test), model)
 end
 
-function score(cv::ParameterSearch, kwargs...)
-    return score(cv.final, kwargs...)
+function search(f::Function, resample::ResampleMethod, search::SearchMethod; preprocess::Function = nopreprocess, maximize::Bool = true)
+    scores = mean(x -> _eval(f, x..., search, preprocess), resample)
+    best = maximize ? argmax(scores) : argmin(scores)
+    return _fit(f, preprocess(resample.data), search[best])
 end
 
 end

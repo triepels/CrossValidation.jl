@@ -1,31 +1,30 @@
 using CrossValidation
-import CrossValidation: predict, score
+import CrossValidation: loss
 
 struct MyModel
     a::Int
-    b::Int
+    b::Float64
 end
 
-function mymodel(x::AbstractArray; a::Int, b::Int)
+function mymodel(x::AbstractArray; a::Int, b::Float64)
     return MyModel(a, b)
 end
 
-function predict(model::MyModel, x::AbstractArray)
-    return rand(size(x)...)
-end
-
-function score(model::MyModel, x::AbstractArray)
-    return sum(predict(model, x) - x)
+function loss(model::MyModel, x::AbstractArray)
+    return rand()
 end
 
 x = rand(2, 100)
 
-search = ExhaustiveSearch(a=1:2, b=3:4)
+val = cv(x -> mymodel(x, a=1, b=2.0), FixedSplit(x))
+val = cv(x -> mymodel(x, a=1, b=2.0), RandomSplit(x))
+val = cv(x -> mymodel(x, a=1, b=2.0), KFold(x))
+val = cv(x -> mymodel(x, a=1, b=2.0), ForwardChaining(x, 40, 10))
+val = cv(x -> mymodel(x, a=1, b=2.0), SlidingWindow(x, 40, 10))
 
-cv = crossvalidate(mymodel, FixedSplit(x), search)
-cv = crossvalidate(mymodel, RandomSplit(x), search)
-cv = crossvalidate(mymodel, KFold(x), search)
-cv = crossvalidate(mymodel, ForwardChaining(x, 40, 10), search)
-cv = crossvalidate(mymodel, SlidingWindow(x, 40, 10), search)
+space = SearchSpace{(:a, :b)}(1:100, 1.0:0.1:10.0)
 
-cv = crossvalidate((x) -> crossvalidate(mymodel, FixedSplit(x), search), RandomSplit(x))
+method = search(mymodel, FixedSplit(x), ExhaustiveSearch(space))
+method = search(mymodel, FixedSplit(x), RandomSearch(space, 100))
+
+nested = cv((x) -> search(mymodel, FixedSplit(x), ExhaustiveSearch(space)), RandomSplit(x))
