@@ -291,7 +291,7 @@ function _eval(f, train, test, search, preprocess)
 end
 
 function search(f::Function, resample::ResampleMethod, search::SearchMethod; preprocess::Function = nopreprocess, maximize::Bool = true)
-    length(search) ≥ 1 || throw(ArgumentError("unable to search the search space"))
+    length(search) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     scores = mean(x -> _eval(f, x..., search, preprocess), resample)
     best = maximize ? argmax(scores) : argmin(scores)
     return _fit(f, preprocess(data(resample)), search[best])
