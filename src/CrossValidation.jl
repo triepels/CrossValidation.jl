@@ -4,7 +4,7 @@ using Base: @propagate_inbounds
 using Random: shuffle!
 using Distributed: pmap
 
-export Resampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow,
+export Resampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
        SearchSpace, Optimizer, ExhaustiveSearch, RandomSearch,
        loss, cv, optimize
 
@@ -178,6 +178,23 @@ end
     return (train, test), state + 1
 end
 
+struct PreProcess <: Resampler
+    res::Resampler
+    f::Function
+end
+
+Base.eltype(p::PreProcess) = eltype(p.res)
+Base.length(p::PreProcess) = length(p.res)
+
+data(p::PreProcess) = p.f(data(p.res))
+
+function Base.iterate(r::PreProcess, state = 1)
+    next = iterate(r.res, state)
+    next === nothing && return nothing
+    (train, test), state = next
+    return r.f(train, test), state
+end
+
 struct SearchSpace{names, T<:Tuple}
     args::T
 end
@@ -272,29 +289,27 @@ _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
 loss(model, x) = throw(ErrorException("unable to dispatch on loss function"))
 
-function _eval(f, train, test, preprocess)
-    train, test = preprocess(train, test)
+function _eval(f, train, test)
     model = _fit(f, train)
     return loss(model, test)
 end
 
-function cv(f::Function, res::Resampler; preprocess::Function = nopreprocess)
-    return map(x -> _eval(f, x..., preprocess), res)
+function cv(f::Function, res::Resampler)
+    return map(x -> _eval(f, x...), res)
 end
 
 mean(f, itr) = sum(f, itr) / length(itr)
 
-function _eval(f, train, test, opt, preprocess)
-    train, test = preprocess(train, test)
-    model = pmap(x -> _fit(f, train, x), opt)
-    return map(x -> loss(x, test), model)
+function _eval(f, train, test, opt)
+    models = pmap(x -> _fit(f, train, x), opt)
+    return map(x -> loss(x, test), models)
 end
 
-function optimize(f::Function, res::Resampler, opt::Optimizer; preprocess::Function = nopreprocess, maximize::Bool = true)
+function optimize(f::Function, res::Resampler, opt::Optimizer; maximize::Bool = true)
     length(opt) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    scores = mean(x -> _eval(f, x..., opt, preprocess), res)
+    scores = mean(x -> _eval(f, x..., opt), res)
     best = maximize ? argmax(scores) : argmin(scores)
-    return _fit(f, preprocess(data(res)), opt[best])
+    return _fit(f, data(res), opt[best])
 end
 
 end

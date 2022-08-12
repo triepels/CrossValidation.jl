@@ -17,15 +17,22 @@ end
 
 x = rand(2, 100)
 
+f(train) = train ./ 10
+f(train, test) = train ./ 10, test ./ 10
+
 scores = cv(x -> mymodel(x, a=1, b=2.0), FixedSplit(x))
 scores = cv(x -> mymodel(x, a=1, b=2.0), RandomSplit(x))
 scores = cv(x -> mymodel(x, a=1, b=2.0), KFold(x))
 scores = cv(x -> mymodel(x, a=1, b=2.0), ForwardChaining(x, 40, 10))
 scores = cv(x -> mymodel(x, a=1, b=2.0), SlidingWindow(x, 40, 10))
 
+scores = cv(x -> mymodel(x, a=1, b=2.0), PreProcess(FixedSplit(x), f))
+
 space = SearchSpace{(:a, :b)}(1:100, 1.0:0.1:10.0)
 
 model = optimize(mymodel, FixedSplit(x), ExhaustiveSearch(space))
 model = optimize(mymodel, FixedSplit(x), RandomSearch(space, 100))
+
+model = optimize(mymodel, PreProcess(FixedSplit(x), f), RandomSearch(space, 100))
 
 nested = cv((x) -> optimize(mymodel, FixedSplit(x), ExhaustiveSearch(space)), RandomSplit(x))
