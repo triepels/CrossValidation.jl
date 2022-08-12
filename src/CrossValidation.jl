@@ -284,7 +284,7 @@ _fit(f, x::Union{Tuple, NamedTuple}, args) = f(x...; args...)
 _loss(model, x::AbstractArray) = loss(model, x)
 _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
-loss(model, x) = throw(ErrorException("unable to dispatch on loss function"))
+loss(model, x) = throw(ErrorException("no loss function defined for $(typeof(model))"))
 
 function _eval(f, train, test)
     model = _fit(f, train)
