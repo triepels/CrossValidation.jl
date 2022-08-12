@@ -230,14 +230,33 @@ end
     return NamedTuple{names}(map(getindex, s.args, I))
 end
 
-abstract type Optimizer end
+abstract type Optimizer{T} end
 
 @propagate_inbounds function Base.iterate(s::Optimizer, state = 1)
     state > length(s) && return nothing
     return s[state], state + 1
 end
 
-struct ExhaustiveSearch <: Optimizer
+_fit(T, x::AbstractArray, args) = T(x; args...)
+_fit(T, x::Union{Tuple, NamedTuple}, args) = T(x...; args...)
+
+_loss(model, x::AbstractArray) = loss(model, x)
+_loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
+
+loss(model, x) = throw(ErrorException("no loss function defined for $(typeof(model))"))
+
+function _eval(opt::Optimizer{T}, train, test) where T
+    models = pmap(args -> _fit(T, train, args), opt)
+    return map(model -> _loss(model, test), models)
+end
+
+mean(f, itr) = sum(f, itr) / length(itr)
+
+function eval(s::Optimizer{T}, res::Resampler) where T
+    return mean(x -> _eval(s, x...), res)
+end
+
+struct ExhaustiveSearch{T} <: Optimizer{T}
     space::SearchSpace
 end
 
@@ -249,12 +268,12 @@ Base.length(s::ExhaustiveSearch) = length(s.space)
     return @inbounds s.space[i]
 end
 
-struct RandomSearch <: Optimizer
+struct RandomSearch{T} <: Optimizer{T}
     space::SearchSpace
     cand::Vector{Int}
 end
 
-function RandomSearch(space::SearchSpace, n::Int = 1)
+function RandomSearch{T}(space::SearchSpace, n::Int = 1) where T
     m = length(space)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from search space"))
     cand = sizehint!(Int[], n)
@@ -265,7 +284,7 @@ function RandomSearch(space::SearchSpace, n::Int = 1)
         end
         push!(cand, c)
     end
-    return RandomSearch(space, cand)
+    return RandomSearch{T}(space, cand)
 end
 
 Base.eltype(s::RandomSearch) = eltype(s.space)
@@ -278,35 +297,15 @@ end
 
 _fit(f, x::AbstractArray) = f(x)
 _fit(f, x::Union{Tuple, NamedTuple}) = f(x...)
-_fit(f, x::AbstractArray, args) = f(x; args...)
-_fit(f, x::Union{Tuple, NamedTuple}, args) = f(x...; args...)
-
-_loss(model, x::AbstractArray) = loss(model, x)
-_loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
-
-loss(model, x) = throw(ErrorException("no loss function defined for $(typeof(model))"))
-
-function _eval(f, train, test)
-    model = _fit(f, train)
-    return loss(model, test)
-end
 
 function cv(f::Function, res::Resampler)
-    return map(x -> _eval(f, x...), res)
+    return map(data -> _loss(_fit(f, data[1]), data[2]), res)
 end
 
-mean(f, itr) = sum(f, itr) / length(itr)
-
-function _eval(f, train, test, opt)
-    models = pmap(x -> _fit(f, train, x), opt)
-    return map(x -> loss(x, test), models)
-end
-
-function optimize(f::Function, res::Resampler, opt::Optimizer; maximize::Bool = true)
+function optimize(opt::Optimizer{T}, res::Resampler; maximize::Bool = true) where T
     length(opt) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    scores = mean(x -> _eval(f, x..., opt), res)
-    best = maximize ? argmax(scores) : argmin(scores)
-    return _fit(f, data(res), opt[best])
+    best = maximize ? argmax(eval(opt, res)) : argmin(eval(opt, res))
+    return _fit(T, data(res), opt[best])
 end
 
 end
