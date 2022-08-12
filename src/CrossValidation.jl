@@ -276,9 +276,6 @@ Base.length(s::RandomSearch) = length(s.cand)
     return @inbounds s.space[s.cand[i]]
 end
 
-nopreprocess(train) = train
-nopreprocess(train, test) = train, test
-
 _fit(f, x::AbstractArray) = f(x)
 _fit(f, x::Union{Tuple, NamedTuple}) = f(x...)
 _fit(f, x::AbstractArray, args) = f(x; args...)
