@@ -230,33 +230,33 @@ end
     return NamedTuple{names}(map(getindex, s.args, I))
 end
 
-abstract type Optimizer{T} end
+abstract type Optimizer end
 
 @propagate_inbounds function Base.iterate(s::Optimizer, state = 1)
     state > length(s) && return nothing
     return s[state], state + 1
 end
 
-_fit(T, x::AbstractArray, args) = T(x; args...)
-_fit(T, x::Union{Tuple, NamedTuple}, args) = T(x...; args...)
+_fit(f, x::AbstractArray, args) = f(x; args...)
+_fit(f, x::Union{Tuple, NamedTuple}, args) = f(x...; args...)
 
 _loss(model, x::AbstractArray) = loss(model, x)
 _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
 loss(model, x) = throw(ErrorException("no loss function defined for $(typeof(model))"))
 
-function _eval(opt::Optimizer{T}, train, test) where T
-    models = pmap(args -> _fit(T, train, args), opt)
+function _eval(f, opt, train, test)
+    models = pmap(args -> _fit(f, train, args), opt)
     return map(model -> _loss(model, test), models)
 end
 
 mean(f, itr) = sum(f, itr) / length(itr)
 
-function eval(s::Optimizer{T}, res::Resampler) where T
-    return mean(x -> _eval(s, x...), res)
+function eval(f::Function, opt::Optimizer, res::Resampler)
+    return mean(x -> _eval(f, opt, x...), res)
 end
 
-struct ExhaustiveSearch{T} <: Optimizer{T}
+struct ExhaustiveSearch <: Optimizer
     space::SearchSpace
 end
 
@@ -268,12 +268,12 @@ Base.length(s::ExhaustiveSearch) = length(s.space)
     return @inbounds s.space[i]
 end
 
-struct RandomSearch{T} <: Optimizer{T}
+struct RandomSearch <: Optimizer
     space::SearchSpace
     cand::Vector{Int}
 end
 
-function RandomSearch{T}(space::SearchSpace, n::Int = 1) where T
+function RandomSearch(space::SearchSpace, n::Int = 1) where T
     m = length(space)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from search space"))
     cand = sizehint!(Int[], n)
@@ -284,7 +284,7 @@ function RandomSearch{T}(space::SearchSpace, n::Int = 1) where T
         end
         push!(cand, c)
     end
-    return RandomSearch{T}(space, cand)
+    return RandomSearch(space, cand)
 end
 
 Base.eltype(s::RandomSearch) = eltype(s.space)
@@ -302,10 +302,10 @@ function cv(f::Function, res::Resampler)
     return map(data -> _loss(_fit(f, data[1]), data[2]), res)
 end
 
-function optimize(opt::Optimizer{T}, res::Resampler; maximize::Bool = true) where T
+function optimize(f::Function, opt::Optimizer, res::Resampler; maximize::Bool = true)
     length(opt) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    best = maximize ? argmax(eval(opt, res)) : argmin(eval(opt, res))
-    return _fit(T, data(res), opt[best])
+    best = maximize ? argmax(eval(f, opt, res)) : argmin(eval(f, opt, res))
+    return _fit(f, data(res), opt[best])
 end
 
 end
