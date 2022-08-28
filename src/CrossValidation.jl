@@ -4,9 +4,9 @@ using Base: @propagate_inbounds
 using Random: shuffle!
 using Distributed: pmap
 
-export Resampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
-       SearchSpace, Optimizer, ExhaustiveSearch, RandomSearch,
-       loss, cv, optimize
+export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
+       ParameterSpace, ParameterSampler, GridSampler, RandomSampler,
+       fit!, loss, cv, brute, hc, Budget, sha
 
 nobs(x::AbstractArray) = size(x)[end]
 
@@ -29,11 +29,11 @@ restype(x::NamedTuple) = NamedTuple{keys(x), Tuple{map(restype, x)...}}
 restype(x::AbstractArray) = Array{eltype(x), ndims(x)}
 restype(x::Any) = typeof(x)
 
-abstract type Resampler end
+abstract type DataSampler end
 
-Base.eltype(r::Resampler) = Tuple{restype(r.data), restype(r.data)}
+Base.eltype(r::DataSampler) = Tuple{restype(r.data), restype(r.data)}
 
-struct FixedSplit{D} <: Resampler
+struct FixedSplit{D} <: DataSampler
     data::D
     nobs::Int
     ratio::Number
@@ -51,7 +51,7 @@ function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     return FixedSplit(data, n, m / n)
 end
 
-data(r::FixedSplit) = r.data
+getdata(r::FixedSplit) = r.data
 Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
@@ -62,7 +62,7 @@ Base.length(r::FixedSplit) = 1
     return (train, test), state + 1
 end
 
-struct RandomSplit{D} <: Resampler
+struct RandomSplit{D} <: DataSampler
     data::D
     nobs::Int
     ratio::Number
@@ -81,7 +81,7 @@ function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     return RandomSplit(data, n, m / n, shuffle!([1:n;]))
 end
 
-data(r::RandomSplit) = r.data
+getdata(r::RandomSplit) = r.data
 Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
@@ -92,7 +92,7 @@ Base.length(r::RandomSplit) = 1
     return (train, test), state + 1
 end
 
-struct KFold{D} <: Resampler
+struct KFold{D} <: DataSampler
     data::D
     nobs::Int
     folds::Int
@@ -105,7 +105,7 @@ function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
     return KFold(data, n, k, shuffle!([1:n;]))
 end
 
-data(r::KFold) = r.data
+getdata(r::KFold) = r.data
 Base.length(r::KFold) = r.folds
 
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
@@ -118,7 +118,7 @@ Base.length(r::KFold) = r.folds
     return (train, test), state + 1
 end
 
-struct ForwardChaining{D} <: Resampler
+struct ForwardChaining{D} <: DataSampler
     data::D
     nobs::Int
     init::Int
@@ -134,7 +134,7 @@ function ForwardChaining(data::Union{AbstractArray, Tuple, NamedTuple}, init::In
     return ForwardChaining(data, n, init, out, partial)
 end
 
-data(r::ForwardChaining) = r.data
+getdata(r::ForwardChaining) = r.data
 
 function Base.length(r::ForwardChaining)
     l = (r.nobs - r.init) / r.out
@@ -148,7 +148,7 @@ end
     return (train, test), state + 1
 end
 
-struct SlidingWindow{D} <: Resampler
+struct SlidingWindow{D} <: DataSampler
     data::D
     nobs::Int
     window::Int
@@ -164,7 +164,7 @@ function SlidingWindow(data::Union{AbstractArray, Tuple, NamedTuple}, window::In
     return SlidingWindow(data, n, window, out, partial)
 end
 
-data(r::SlidingWindow) = r.data
+getdata(r::SlidingWindow) = r.data
 
 function Base.length(r::SlidingWindow)
     l = (r.nobs - r.window) / r.out
@@ -178,15 +178,15 @@ end
     return (train, test), state + 1
 end
 
-struct PreProcess <: Resampler
-    res::Resampler
+struct PreProcess <: DataSampler
+    res::DataSampler
     f::Function
 end
 
 Base.eltype(p::PreProcess) = eltype(p.res)
 Base.length(p::PreProcess) = length(p.res)
 
-data(p::PreProcess) = p.f(data(p.res))
+getdata(p::PreProcess) = p.f(getdata(p.res))
 
 function Base.iterate(r::PreProcess, state = 1)
     next = iterate(r.res, state)
@@ -195,117 +195,230 @@ function Base.iterate(r::PreProcess, state = 1)
     return r.f(train, test), state
 end
 
-struct SearchSpace{names, T<:Tuple}
+struct ParameterSpace{names, T<:Tuple}
     args::T
 end
 
-function SearchSpace{names}(args::Vararg) where names
+function ParameterSpace{names}(args::Vararg) where names
     if length(args) != length(names::Tuple)
         throw(ArgumentError("argument names and values must have matching lengths"))
     end
-    return SearchSpace{names, typeof(args)}(args)
+    return ParameterSpace{names, typeof(args)}(args)
 end
 
-Base.eltype(::Type{SearchSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
-Base.length(s::SearchSpace) = prod(length, s.args)
+Base.eltype(::Type{ParameterSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
+Base.length(s::ParameterSpace) = prod(length, s.args)
 
-Base.firstindex(s::SearchSpace) = 1
-Base.lastindex(s::SearchSpace) = length(s)
+Base.firstindex(s::ParameterSpace) = 1
+Base.lastindex(s::ParameterSpace) = length(s)
 
-Base.size(s::SearchSpace) = map(length, s.args)
+Base.size(s::ParameterSpace) = map(length, s.args)
 
-function Base.size(s::SearchSpace, d::Integer)
+function Base.size(s::ParameterSpace, d::Integer)
     @boundscheck d < 1 && throw(DimensionMismatch("dimension out of range"))
     return d > length(s.args) ? 1 : length(s.args[d])
 end
 
-@inline function Base.getindex(s::SearchSpace{names, T}, i::Int) where {names, T}
+@inline function Base.getindex(s::ParameterSpace{names, T}, i::Int) where {names, T}
     @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
     strides = (1, cumprod(map(length, Base.front(s.args)))...)
     return NamedTuple{names}(map(getindex, s.args, mod.((i - 1) .÷ strides, size(s)) .+ 1))
 end
 
-@inline function Base.getindex(s::SearchSpace{names, T}, I::Vararg{Int, N}) where {names, T, N}
+@inline function Base.getindex(s::ParameterSpace{names, T}, I::Vararg{Int, N}) where {names, T, N}
     @boundscheck length(I) == length(s.args) && all(1 .≤ I .≤ size(s)) || throw(BoundsError(s, I))
     return NamedTuple{names}(map(getindex, s.args, I))
 end
 
-abstract type Optimizer end
+@inline function Base.getindex(s::ParameterSpace{names, T}, inds::Vector{Int}) where {names, T}
+    return [s[i] for i in inds]
+end
 
-@propagate_inbounds function Base.iterate(s::Optimizer, state = 1)
+abstract type ParameterSampler end
+
+@propagate_inbounds function Base.iterate(s::ParameterSampler, state = 1)
     state > length(s) && return nothing
     return s[state], state + 1
 end
 
+# To do: add gap between elements?
+struct GridSampler <: ParameterSampler
+    space::ParameterSpace
+end
+
+Base.eltype(s::GridSampler) = eltype(s.space)
+Base.length(s::GridSampler) = length(s.space)
+
+@inline function Base.getindex(s::GridSampler, i::Int)
+    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
+    return @inbounds s.space[i]
+end
+
+struct RandomSampler <: ParameterSampler
+    space::ParameterSpace
+    inds::Vector{Int}
+end
+
+function RandomSampler(space::ParameterSpace; n::Int = 1)
+    m = length(space)
+    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from search space"))
+    inds = sizehint!(Int[], n)
+    for _ in 1:n
+        i = rand(1:m)
+        while i in inds
+            i = rand(1:m)
+        end
+        push!(inds, i)
+    end
+    return RandomSampler(space, inds)
+end
+
+Base.eltype(s::RandomSampler) = eltype(s.space)
+Base.length(s::RandomSampler) = length(s.inds)
+
+@inline function Base.getindex(s::RandomSampler, i::Int)
+    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
+    return @inbounds s.space[s.inds[i]]
+end
+
+_fit(f, x::AbstractArray) = f(x)
+_fit(f, x::Union{Tuple, NamedTuple}) = f(x...)
 _fit(f, x::AbstractArray, args) = f(x; args...)
 _fit(f, x::Union{Tuple, NamedTuple}, args) = f(x...; args...)
 
 _loss(model, x::AbstractArray) = loss(model, x)
 _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
-loss(model, x) = throw(ErrorException("no loss function defined for $(typeof(model))"))
+loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(model))"))
 
-function _eval(f, opt, train, test)
-    models = pmap(args -> _fit(f, train, args), opt)
+function _evalfold(f, parms, train, test)
+    models = pmap(args -> _fit(f, train, args), parms)
     return map(model -> _loss(model, test), models)
 end
 
 mean(f, itr) = sum(f, itr) / length(itr)
 
-function eval(f::Function, opt::Optimizer, res::Resampler)
-    return mean(x -> _eval(f, opt, x...), res)
+function _eval(f, parms, data)
+    return mean(fold -> _evalfold(f, parms, fold...), data)
 end
 
-struct ExhaustiveSearch <: Optimizer
-    space::SearchSpace
+function cv(f::Function, data::DataSampler)
+    return map(fold -> _loss(_fit(f, fold[1]), fold[2]), data)
 end
 
-Base.eltype(s::ExhaustiveSearch) = eltype(s.space)
-Base.length(s::ExhaustiveSearch) = length(s.space)
-
-@inline function Base.getindex(s::ExhaustiveSearch, i::Int)
-    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
-    return @inbounds s.space[i]
+function brute(f::Function, parms::ParameterSampler, data::DataSampler; maximize::Bool = true)
+    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    best = maximize ? argmax(_eval(f, parms, data)) : argmin(_eval(f, parms, data))
+    return _fit(f, getdata(data), parms[best])
 end
 
-struct RandomSearch <: Optimizer
-    space::SearchSpace
-    cand::Vector{Int}
-end
-
-function RandomSearch(space::SearchSpace, n::Int = 1) where T
-    m = length(space)
-    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from search space"))
-    cand = sizehint!(Int[], n)
-    for _ in 1:n
-        c = rand(1:m)
-        while c in cand
-            c = rand(1:m)
+function _candidates(space, i)
+    dim = size(space)
+    cand = sizehint!(Int[], 2 * length(dim))
+    @inbounds for j in eachindex(dim)
+        if j == 1
+            ind = mod(i - 1, dim[1]) + 1
+            if ind > 1
+                push!(cand, i - 1)
+            end
+            if ind < dim[1]
+                push!(cand, i + 1)
+            end
+        else
+            ind = mod((i - 1) ÷ dim[j - 1], dim[j]) + 1
+            if ind > 1
+                push!(cand, i - dim[j - 1])
+            end
+            if ind < dim[j]
+                push!(cand, i + dim[j - 1])
+            end
         end
-        push!(cand, c)
     end
-    return RandomSearch(space, cand)
+    return cand
 end
 
-Base.eltype(s::RandomSearch) = eltype(s.space)
-Base.length(s::RandomSearch) = length(s.cand)
+function hc(f::Function, space::ParameterSpace, data::DataSampler; maximize::Bool = true)
+    n = length(space)
+    n ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
-@inline function Base.getindex(s::RandomSearch, i::Int)
-    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
-    return @inbounds s.space[s.cand[i]]
+    best = rand(1:n)
+    loss = maximize ? -Inf : Inf
+    cand = _candidates(space, best)
+
+    @debug "Start Hill-Climbing"
+
+    while !isempty(cand)
+        clss = _eval(f, space[cand], data)
+
+        if maximize
+            cbst = argmax(clss)
+            if loss ≥ clss[cbst] 
+                break
+            end
+        else
+            cbst = argmin(clss)
+            if loss ≤ clss[cbst]
+                break
+            end
+        end
+        
+        best = cand[cbst]
+        loss = clss[cbst]
+
+        cand = _candidates(space, best)
+
+        @debug "$loss\t$(space[best])"
+    end
+
+    @debug "Finished Hill-Climbing"
+
+    return _fit(f, getdata(data), space[best])
 end
 
-_fit(f, x::AbstractArray) = f(x)
-_fit(f, x::Union{Tuple, NamedTuple}) = f(x...)
+_fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
+_fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
 
-function cv(f::Function, res::Resampler)
-    return map(data -> _loss(_fit(f, data[1]), data[2]), res)
+fit!(model, x; args...) = throw(ErrorException("no fit! function defined for $(typeof(model))"))
+
+const Budget = NamedTuple{names, T} where {names, T<:Tuple{Vararg{Int}}}
+
+_budgetat(budget, k, n) = map(x -> floor(Int, x / (k * ceil(Int, log2(n)))), budget)
+
+function _evalarms(arms, args, data)
+    train, test = first(data)
+    arms = pmap(arm -> _fit!(arm, train, args), arms)
+    return map(arm -> _loss(arm, test), arms)
 end
 
-function optimize(f::Function, opt::Optimizer, res::Resampler; maximize::Bool = true)
-    length(opt) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    best = maximize ? argmax(eval(f, opt, res)) : argmin(eval(f, opt, res))
-    return _fit(f, data(res), opt[best])
+function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler; maximize::Bool = true)
+    n = length(parms)
+    n ≥ 1 || throw(ArgumentError("nothing to optimize"))
+
+    inds = [1:n;]
+    arms = map(args -> M(args...), parms)
+
+    @debug "Start Successive Halving"
+
+    k = n
+    while k > 1
+        m = ceil(Int, k / 2)
+
+        args = _budgetat(budget, k ,n)
+        loss = _evalarms(arms, args, data)  
+
+        best = sortperm(loss, rev=maximize)[1:m]
+
+        inds = inds[best]
+        arms = arms[best]
+
+        @debug "$k\t$(loss[best[1]])\t$(parms[best[1]])\t$args"
+
+        k = m
+    end
+
+    @debug "Finished Successive Halving"
+
+    return _fit!(M(parms[inds[1]]...), getdata(data), budget)
 end
 
 end
