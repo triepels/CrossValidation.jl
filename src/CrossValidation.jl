@@ -411,7 +411,7 @@ function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler
         inds = inds[best]
         arms = arms[best]
 
-        @debug "$k\t$(loss[best[1]])\t$(parms[best[1]])\t$args"
+        @debug "$k\t$(loss[best[1]])\t$(parms[inds[1]])\t$args"
 
         k = m
     end
