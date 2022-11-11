@@ -411,7 +411,7 @@ function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler
         inds = inds[best]
         arms = arms[best]
 
-        @debug "$k\t$(loss[best[1]])\t$(parms[inds[1]])\t$args"
+        @debug "$n\t$(loss[best[1]])\t$(parms[inds[1]])\t$args"
     end
 
     @debug "Finished Successive Halving"
