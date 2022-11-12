@@ -382,7 +382,7 @@ fit!(model, x; args...) = throw(ErrorException("no fit! function defined for $(t
 
 const Budget = NamedTuple{names, T} where {names, T<:Tuple{Vararg{Int}}}
 
-_budgetat(budget, i, m) = map(x -> floor(Int, 2^(i - 1) * x / (2^m - 1)), budget)
+_budgetat(budget, rate, i, m) = map(x -> floor(Int, (1 / rate)^(i - 1) * x * (1 - 1 / rate) / (1 - (1 / rate)^m)), budget)
 
 function _evalarms(arms, args, data)
     train, test = first(data)
@@ -390,20 +390,21 @@ function _evalarms(arms, args, data)
     return map(arm -> _loss(arm, test), arms)
 end
 
-function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler; maximize::Bool = true)
+function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler; rate::Number = 0.5, maximize::Bool = true)
     n = length(parms)
     n ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    0 < rate < 1 || throw(ArgumentError("rate should be between 0 and 1"))
 
     inds = [1:n;]
     arms = map(args -> M(args...), parms)
 
     @debug "Start Successive Halving"
 
-    m = ceil(Int, log2(n))
+    m = ceil(Int, log(rate, n))
     for i in 1:m
         n = ceil(Int, n / 2)
 
-        args = _budgetat(budget, i, m)
+        args = _budgetat(budget, rate, i, m)
         loss = _evalarms(arms, args, data)
 
         best = sortperm(loss, rev=maximize)[1:n]
