@@ -400,7 +400,7 @@ function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler
 
     @debug "Start Successive Halving"
 
-    m = ceil(Int, log(rate, n))
+    m = ceil(Int, log(1 / rate, n))
     for i in 1:m
         n = ceil(Int, n / 2)
 
