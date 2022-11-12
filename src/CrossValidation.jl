@@ -392,13 +392,14 @@ function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler
     n = length(parms)
     n ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
+    m = ceil(Int, log2(n))
+
     inds = [1:n;]
     arms = map(args -> M(args...), parms)
-    args = map(x -> floor(Int, x / n), budget)
+    args = map(x -> floor(Int, x / m), budget)
 
     @debug "Start Successive Halving"
-
-    m = ceil(Int, log2(n))
+    
     for _ in 1:m
         n = ceil(Int, n / 2)
 
