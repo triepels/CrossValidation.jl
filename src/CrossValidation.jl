@@ -2,7 +2,7 @@ module CrossValidation
 
 using Base: @propagate_inbounds
 using Random: shuffle!
-using Distributed: pmap
+using Distributed: @distributed, pmap
 
 export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
        ParameterSpace, ParameterSampler, GridSampler, RandomSampler,
@@ -382,11 +382,20 @@ fit!(model, x; args...) = throw(ErrorException("no fit! function defined for $(t
 
 const Budget = NamedTuple{names, T} where {names, T<:Tuple{Vararg{Int}}}
 
+struct Arm{M,P}
+    model::M
+    parms::P
+end
+
 function _evalarms(arms, args, data)
     train, test = first(data)
-    arms = pmap(arm -> _fit!(arm, train, args), arms)
-    return map(arm -> _loss(arm, test), arms)
+    @distributed for arm in arms
+        _fit!(arm.model, train, args)
+    end
+    return map(arm -> _loss(arm.model, test), arms)
 end
+
+_halve!(x) = resize!(x, ceil(Int, length(x) / 2))
 
 function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler; maximize::Bool = true)
     n = length(parms)
@@ -394,28 +403,18 @@ function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler
 
     m = ceil(Int, log2(n))
 
-    inds = [1:n;]
-    arms = map(args -> M(args...), parms)
+    arms = map(x -> Arm(M(x...), x), parms)
     args = map(x -> floor(Int, x / m), budget)
 
-    @debug "Start Successive Halving"
-    
-    for _ in 1:m
-        n = ceil(Int, n / 2)
-
+    @debug "Start successive halving"   
+    for i in 1:m
         loss = _evalarms(arms, args, data)
-
-        best = sortperm(loss, rev=maximize)[1:n]
-
-        inds = inds[best]
-        arms = arms[best]
-
-        @debug "$n\t$(loss[best[1]])\t$(parms[inds[1]])\t$args"
+        @debug "Completed iteration $i" arms args loss
+        arms = _halve!(arms[sortperm(loss, rev=maximize)])
     end
+    @debug "Finished successive halving"
 
-    @debug "Finished Successive Halving"
-
-    return _fit!(M(parms[inds[1]]...), getdata(data), budget)
+    return _fit!(M(arms[1].parms...), getdata(data), budget)
 end
 
 end
