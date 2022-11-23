@@ -299,7 +299,9 @@ end
 mean(f, itr) = sum(f, itr) / length(itr)
 
 function _eval(f, parms, data)
-    return mean(fold -> _evalfold(f, parms, fold...), data)
+    loss = mean(fold -> _evalfold(f, parms, fold...), data)
+    @debug "Evaluated models" parms=collect(parms) loss
+    return loss
 end
 
 function cv(f::Function, data::DataSampler)
@@ -308,7 +310,9 @@ end
 
 function brute(f::Function, parms::ParameterSampler, data::DataSampler; maximize::Bool = true)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    @debug "Start brute-force search"
     best = maximize ? argmax(_eval(f, parms, data)) : argmin(_eval(f, parms, data))
+    @debug "Finished brute-force search"
     return _fit(f, getdata(data), parms[best])
 end
 
@@ -345,8 +349,7 @@ function hc(f::Function, space::ParameterSpace, data::DataSampler; maximize::Boo
     loss = maximize ? -Inf : Inf
     cand = _candidates(space, best)
 
-    @debug "Start Hill-Climbing"
-
+    @debug "Start hill-climbing"
     while !isempty(cand)
         clss = _eval(f, space[cand], data)
 
@@ -366,11 +369,8 @@ function hc(f::Function, space::ParameterSpace, data::DataSampler; maximize::Boo
         loss = clss[cbst]
 
         cand = _candidates(space, best)
-
-        @debug "$loss\t$(space[best])"
     end
-
-    @debug "Finished Hill-Climbing"
+    @debug "Finished hill-climbing"
 
     return _fit(f, getdata(data), space[best])
 end
@@ -392,7 +392,9 @@ function _evalarms(arms, args, data)
     @distributed for arm in arms
         _fit!(arm.model, train, args)
     end
-    return map(arm -> _loss(arm.model, test), arms)
+    loss = map(arm -> _loss(arm.model, test), arms)
+    @debug "Evaluated arms" arms args loss
+    return loss
 end
 
 _halve!(x) = resize!(x, ceil(Int, length(x) / 2))
@@ -407,9 +409,8 @@ function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler
     args = map(x -> floor(Int, x / m), budget)
 
     @debug "Start successive halving"   
-    for i in 1:m
+    for _ in 1:m
         loss = _evalarms(arms, args, data)
-        @debug "Iteration $i" arms args loss
         arms = _halve!(arms[sortperm(loss, rev=maximize)])
     end
     @debug "Finished successive halving"
