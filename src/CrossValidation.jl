@@ -409,7 +409,7 @@ function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler
     @debug "Start successive halving"   
     for i in 1:m
         loss = _evalarms(arms, args, data)
-        @debug "Completed iteration $i" arms args loss
+        @debug "Iteration $i" arms args loss
         arms = _halve!(arms[sortperm(loss, rev=maximize)])
     end
     @debug "Finished successive halving"
