@@ -393,7 +393,7 @@ function _evalarms(arms, args, data)
         _fit!(arm.model, train, args)
     end
     loss = map(arm -> _loss(arm.model, test), arms)
-    @debug "Evaluated arms" arms args loss
+    @debug "Evaluated arms" arms args loss # TO DO: attach only parameters
     return loss
 end
 
