@@ -2,11 +2,11 @@ module CrossValidation
 
 using Base: @propagate_inbounds
 using Random: shuffle!
-using Distributed: @distributed, pmap
+using Distributed: @distributed
 
 export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
        ParameterSpace, ParameterSampler, GridSampler, RandomSampler,
-       fit!, loss, cv, brute, hc, Budget, sha
+       fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha
 
 nobs(x::AbstractArray) = size(x)[end]
 
@@ -199,20 +199,17 @@ struct ParameterSpace{names, T<:Tuple}
     args::T
 end
 
-function ParameterSpace{names}(args::Vararg) where names
-    if length(args) != length(names::Tuple)
-        throw(ArgumentError("argument names and values must have matching lengths"))
-    end
-    return ParameterSpace{names, typeof(args)}(args)
+function ParameterSpace(; args...)
+    return ParameterSpace{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
 Base.eltype(::Type{ParameterSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
-Base.length(s::ParameterSpace) = prod(length, s.args)
+Base.length(s::ParameterSpace) = length(s.args) == 0 ? 0 : prod(length, s.args)
 
 Base.firstindex(s::ParameterSpace) = 1
 Base.lastindex(s::ParameterSpace) = length(s)
 
-Base.size(s::ParameterSpace) = map(length, s.args)
+Base.size(s::ParameterSpace) = length(s.args) == 0 ? (0,) : map(length, s.args)
 
 function Base.size(s::ParameterSpace, d::Integer)
     @boundscheck d < 1 && throw(DimensionMismatch("dimension out of range"))
@@ -281,39 +278,54 @@ Base.length(s::RandomSampler) = length(s.inds)
     return @inbounds s.space[s.inds[i]]
 end
 
-_fit(f, x::AbstractArray) = f(x)
-_fit(f, x::Union{Tuple, NamedTuple}) = f(x...)
-_fit(f, x::AbstractArray, args) = f(x; args...)
-_fit(f, x::Union{Tuple, NamedTuple}, args) = f(x...; args...)
+_fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
+_fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
+
+fit!(model, x; args...) = throw(ErrorException("no fit! function defined for $(typeof(model))"))
 
 _loss(model, x::AbstractArray) = loss(model, x)
 _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
 loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(model))"))
 
-function _evalfold(f, parms, train, test)
-    models = pmap(args -> _fit(f, train, args), parms)
-    return map(model -> _loss(model, test), models)
+@inline function _val(T, space, args, data)
+    return sum(x -> _valsplit(T, space, args, x...), data) / length(data)
 end
 
-mean(f, itr) = sum(f, itr) / length(itr)
-
-function _eval(f, parms, data)
-    loss = mean(fold -> _evalfold(f, parms, fold...), data)
-    @debug "Evaluated models" parms=collect(parms) loss
+function _valsplit(T, space, args, train, test)
+    models = map(x -> T(x...), space)
+    @distributed for model in models
+        _fit!(model, train, args)
+    end
+    loss = map(x -> _loss(x, test), models)
+    @debug "Validated models" space=collect(space) args loss
     return loss
 end
 
-function cv(f::Function, data::DataSampler)
-    return map(fold -> _loss(_fit(f, fold[1]), fold[2]), data)
+function validate(model::Any, args::NamedTuple, data::DataSampler)
+    @debug "Start model validation"
+    loss = map(x -> _loss(_fit!(model, x[1], args), x[2]), data)
+    @debug "Finished model validation"
+    return loss
 end
 
-function brute(f::Function, parms::ParameterSampler, data::DataSampler; maximize::Bool = true)
-    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+_f(f, x::AbstractArray) = f(x)
+_f(f, x::Union{Tuple, NamedTuple}) = f(x...)
+
+function validate(f::Function, data::DataSampler)
+    @debug "Start model validation"
+    loss = map(x -> _loss(_f(f, x[1]), x[2]), data)
+    @debug "Finished model validation"
+    return loss
+end
+
+function brute(T::Type, space::ParameterSampler, args::NamedTuple, data::DataSampler; maximize::Bool = true)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
-    best = maximize ? argmax(_eval(f, parms, data)) : argmin(_eval(f, parms, data))
+    loss = _val(T, space, args, data)
     @debug "Finished brute-force search"
-    return _fit(f, getdata(data), parms[best])
+    best = maximize ? argmax(loss) : argmin(loss)
+    return _fit!(T(space[best]...), getdata(data), args)
 end
 
 function _candidates(space, i)
@@ -341,7 +353,7 @@ function _candidates(space, i)
     return cand
 end
 
-function hc(f::Function, space::ParameterSpace, data::DataSampler; maximize::Bool = true)
+function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler; maximize::Bool = true)
     n = length(space)
     n ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
@@ -351,8 +363,7 @@ function hc(f::Function, space::ParameterSpace, data::DataSampler; maximize::Boo
 
     @debug "Start hill-climbing"
     while !isempty(cand)
-        clss = _eval(f, space[cand], data)
-
+        clss = _val(T, space[cand], args, data)
         if maximize
             cbst = argmax(clss)
             if loss ≥ clss[cbst] 
@@ -364,58 +375,67 @@ function hc(f::Function, space::ParameterSpace, data::DataSampler; maximize::Boo
                 break
             end
         end
-        
-        best = cand[cbst]
-        loss = clss[cbst]
-
+        best, loss = cand[cbst], clss[cbst]
         cand = _candidates(space, best)
     end
     @debug "Finished hill-climbing"
 
-    return _fit(f, getdata(data), space[best])
+    return _fit!(T(space[best]...), getdata(data), args)
 end
 
-_fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
-_fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
+abstract type Budget end
 
-fit!(model, x; args...) = throw(ErrorException("no fit! function defined for $(typeof(model))"))
+_cast(T::Type{A}, x::Integer) where A <: AbstractFloat = T(x)
+_cast(T::Type{A}, x::AbstractFloat) where A <: Integer = floor(T, x)
+_cast(T::Type{A}, x::Number) where A <: Number = x
 
-const Budget = NamedTuple{names, T} where {names, T<:Tuple{Vararg{Int}}}
-
-struct Arm{M,P}
-    model::M
-    parms::P
+struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: Budget
+    args::NamedTuple{names, T}
 end
 
-function _evalarms(arms, args, data)
-    train, test = first(data)
-    @distributed for arm in arms
-        _fit!(arm.model, train, args)
-    end
-    loss = map(arm -> _loss(arm.model, test), arms)
-    @debug "Evaluated arms" arms args loss # TO DO: attach only parameters
-    return loss
+getbudget(b::ConstantBudget) = b.args
+
+function getbudget(b::ConstantBudget, i::Int, n::Int)
+    return map(x -> _cast(typeof(x), x / n), b.args)
 end
 
-_halve!(x) = resize!(x, ceil(Int, length(x) / 2))
+struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: Budget
+    args::NamedTuple{names, T}
+    rate::Number
+end
 
-function sha(M::Type, parms::ParameterSampler, budget::Budget, data::DataSampler; maximize::Bool = true)
-    n = length(parms)
-    n ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function GeometricBudget(args::NamedTuple{names, T}; rate::Number = 2) where {names, T<:Tuple{Vararg{Number}}}
+    return GeometricBudget(args, rate)
+end
 
-    m = ceil(Int, log2(n))
+getbudget(b::GeometricBudget) = b.args
 
-    arms = map(x -> Arm(M(x...), x), parms)
-    args = map(x -> floor(Int, x / m), budget)
+function getbudget(b::GeometricBudget, i::Int, n::Int)
+    return map(x -> _cast(typeof(x), b.rate^(i - 1) * x * (b.rate - 1) / (b.rate^n - 1)), b.args)
+end
 
-    @debug "Start successive halving"   
-    for _ in 1:m
-        loss = _evalarms(arms, args, data)
-        arms = _halve!(arms[sortperm(loss, rev=maximize)])
+function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler; maximize::Bool = true)
+    m, n = length(space), length(data)
+    m ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    n == 1 || throw(ArgumentError("cannot optimize by $n resample folds"))
+
+    k = ceil(Int, log2(m))
+    arms = map(x -> (T(x...), x), space)
+
+    @debug "Start successive halving"
+    for i in 1:k
+        train, test = first(data)
+        args = getbudget(budget, i, k)
+        @distributed for arm in arms
+            _fit!(arm[1], train, args)
+        end
+        loss = map(x -> _loss(x[1], test), arms)
+        @debug "Validated arms" space=map(x -> x[2], arms) args loss
+        arms = resize!(arms[sortperm(loss, rev=maximize)], ceil(Int, length(arms) / 2))
     end
     @debug "Finished successive halving"
 
-    return _fit!(M(arms[1].parms...), getdata(data), budget)
+    return _fit!(T(first(arms)[2]...), getdata(data), getbudget(budget))
 end
 
 end
