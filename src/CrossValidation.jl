@@ -293,8 +293,7 @@ loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(
 end
 
 function _valsplit(T, space, args, train, test)
-    models = pmap(x -> _fit!(T(x...), train, args), space)
-    loss = map(x -> _loss(x, test), models)
+    loss = map(x -> _loss(x, test), pmap(x -> _fit!(T(x...), train, args), space))
     @debug "Validated models" space=collect(space) args loss
     return loss
 end
@@ -416,22 +415,24 @@ function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler
     n == 1 || throw(ArgumentError("cannot optimize by $n resample folds"))
 
     k = ceil(Int, log2(m))
-    arms = map(x -> (T(x...), x), space)
+    arms = map(x -> T(x...), space)
+    prms = collect(space)
 
     @debug "Start successive halving"
     for i in 1:k
         train, test = first(data)
         args = getbudget(budget, i, k)
-        @distributed for arm in arms
-            _fit!(arm[1], train, args)
-        end
-        loss = map(x -> _loss(x[1], test), arms)
-        @debug "Validated arms" space=map(x -> x[2], arms) args loss
-        arms = resize!(arms[sortperm(loss, rev=maximize)], ceil(Int, length(arms) / 2))
+        arms = pmap(x -> _fit!(x, train, args), arms)
+        loss = map(x -> _loss(x, test), arms)
+        @debug "Validated arms" space=prms args loss
+        r = ceil(Int, length(arms) / 2)
+        ordr = sortperm(loss, rev=maximize)
+        arms = resize!(arms[ordr], r)
+        prms = resize!(prms[ordr], r)
     end
     @debug "Finished successive halving"
 
-    return _fit!(T(first(arms)[2]...), getdata(data), getbudget(budget))
+    return _fit!(T(prms[1]...), getdata(data), getbudget(budget))
 end
 
 end
