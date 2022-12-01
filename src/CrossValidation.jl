@@ -357,9 +357,8 @@ function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler;
     n = length(space)
     n ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
-    best = rand(1:n)
-    loss = maximize ? -Inf : Inf
-    cand = _candidates(space, best)
+    best, loss = rand(1:n), maximize ? -Inf : Inf
+    cand = [best]
 
     @debug "Start hill-climbing"
     while !isempty(cand)
