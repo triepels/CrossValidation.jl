@@ -293,7 +293,8 @@ loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(
 end
 
 function _valsplit(T, space, args, train, test)
-    loss = map(x -> _loss(x, test), pmap(x -> _fit!(T(x...), train, args), space))
+    models = pmap(x -> _fit!(T(x...), train, args), space)
+    loss = map(x -> _loss(x, test), models)
     @debug "Validated models" space=collect(space) args loss
     return loss
 end
@@ -425,8 +426,8 @@ function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" space=prms args loss
-        r = ceil(Int, length(arms) / 2)
         ordr = sortperm(loss, rev=maximize)
+        r = ceil(Int, length(arms) / 2)
         arms = resize!(arms[ordr], r)
         prms = resize!(prms[ordr], r)
     end
