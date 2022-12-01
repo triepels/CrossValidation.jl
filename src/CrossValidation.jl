@@ -2,7 +2,7 @@ module CrossValidation
 
 using Base: @propagate_inbounds
 using Random: shuffle!
-using Distributed: @distributed
+using Distributed: @distributed, pmap
 
 export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
        ParameterSpace, ParameterSampler, GridSampler, RandomSampler,
@@ -293,10 +293,7 @@ loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(
 end
 
 function _valsplit(T, space, args, train, test)
-    models = map(x -> T(x...), space)
-    @distributed for model in models
-        _fit!(model, train, args)
-    end
+    models = pmap(x -> _fit!(T(x...), train, args), space)
     loss = map(x -> _loss(x, test), models)
     @debug "Validated models" space=collect(space) args loss
     return loss
