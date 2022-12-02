@@ -289,10 +289,10 @@ _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(model))"))
 
 @inline function _val(T, space, args, data)
-    return sum(x -> _valsplit(T, space, args, x...), data) / length(data)
+    return sum(x -> _val_split(T, space, args, x...), data) / length(data)
 end
 
-function _valsplit(T, space, args, train, test)
+function _val_split(T, space, args, train, test)
     models = pmap(x -> _fit!(T(x...), train, args), space)
     loss = map(x -> _loss(x, test), models)
     @debug "Validated models" space=collect(space) args loss
@@ -354,7 +354,8 @@ function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler;
     n = length(space)
     n ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
-    best, loss = rand(1:n), maximize ? -Inf : Inf
+    best = rand(1:n)
+    loss = maximize ? -Inf : Inf
     cand = [best]
 
     @debug "Start hill-climbing"
@@ -410,26 +411,27 @@ function getbudget(b::GeometricBudget, i::Int, n::Int)
     return map(x -> _cast(typeof(x), b.rate^(i - 1) * x * (b.rate - 1) / (b.rate^n - 1)), b.args)
 end
 
+_halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
+
 function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler; maximize::Bool = true)
     m, n = length(space), length(data)
     m ≥ 1 || throw(ArgumentError("nothing to optimize"))
     n == 1 || throw(ArgumentError("cannot optimize by $n resample folds"))
-
-    k = ceil(Int, log2(m))
+    
+    train, test = first(data)
     arms = map(x -> T(x...), space)
     prms = collect(space)
 
+    k = ceil(Int, log2(m))
     @debug "Start successive halving"
     for i in 1:k
-        train, test = first(data)
         args = getbudget(budget, i, k)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
-        @debug "Validated arms" space=prms args loss
-        ordr = sortperm(loss, rev=maximize)
-        r = ceil(Int, length(arms) / 2)
-        arms = resize!(arms[ordr], r)
-        prms = resize!(prms[ordr], r)
+        @debug "Validated arms" space=prms, args, loss
+        inds = sortperm(loss, rev=maximize)
+        arms = _halve!(arms[inds])
+        prms = _halve!(prms[inds])
     end
     @debug "Finished successive halving"
 
