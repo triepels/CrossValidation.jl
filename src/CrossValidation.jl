@@ -429,7 +429,8 @@ end
 getbudget(b::GeometricBudget) = b.args
 
 function getbudget(b::GeometricBudget, i::Int, n::Int)
-    return map(x -> _cast(typeof(x), b.rate^(i - 1) * x * (b.rate - 1) / (b.rate^n - 1)), b.args)
+    r = b.rate
+    return map(x -> _cast(typeof(x), r^(i - 1) * x * (r - 1) / (r^n - 1)), b.args)
 end
 
 _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
