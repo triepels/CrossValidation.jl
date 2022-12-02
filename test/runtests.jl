@@ -8,7 +8,7 @@ struct MyModel
 end
 
 function fit!(model::MyModel, x::AbstractArray; epochs::Int = 1)
-    println("Fitting $model ..."); sleep(1)
+    println("Fitting $model ..."); sleep(0.1)
     return model
 end
 
@@ -30,7 +30,7 @@ space = ParameterSpace(a = -6.0:0.5:6.0, b = -6.0:0.5:6.0)
 
 brute(MyModel, GridSampler(space), (epochs=100,), FixedSplit(x), maximize=false)
 brute(MyModel, RandomSampler(space, n=100), (epochs=100,), FixedSplit(x), maximize=false)
-hc(MyModel, space, (epochs=100,), FixedSplit(x), maximize=false)
+hc(MyModel, space, (epochs=100,), FixedSplit(x), k=1, maximize=false)
 
 sha(MyModel, GridSampler(space), ConstantBudget((epochs=100,)), FixedSplit(x), maximize=false)
 sha(MyModel, RandomSampler(space, n=100), GeometricBudget((epochs=100,), 1.5), FixedSplit(x), maximize=false)

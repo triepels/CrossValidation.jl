@@ -333,17 +333,17 @@ function _candidates(space, blst, state, k)
             ind = mod(state - 1, dim[1]) + 1
             for j in reverse(1:k)
                 if ind - j ≥ 1
-                    can = state - j
-                    if can ∉ blst
-                        push!(cands, can)
+                    cand = state - j
+                    if cand ∉ blst
+                        push!(cands, cand)
                     end
                 end
             end
             for j in 1:k
                 if ind + j ≤ dim[1]
-                    can = state + j
-                    if can ∉ blst
-                        push!(cands, can)
+                    cand = state + j
+                    if cand ∉ blst
+                        push!(cands, cand)
                     end
                 end
             end
@@ -351,17 +351,17 @@ function _candidates(space, blst, state, k)
             ind = mod((state - 1) ÷ dim[i - 1], dim[i]) + 1
             for j in reverse(1:k)
                 if ind - j ≥ 1
-                    can = state - j * dim[i - 1]
-                    if can ∉ blst
-                        push!(cands, can)
+                    cand = state - j * dim[i - 1]
+                    if cand ∉ blst
+                        push!(cands, cand)
                     end
                 end
             end
             for j in 1:k
                 if ind + j ≤ dim[i]
-                    can = state + j * dim[i - 1]
-                    if can ∉ blst
-                        push!(cands, can)
+                    cand = state + j * dim[i - 1]
+                    if cand ∉ blst
+                        push!(cands, cand)
                     end
                 end
             end
@@ -381,19 +381,19 @@ function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler;
     @debug "Start hill-climbing"
     while !isempty(cands)
         append!(blst, cands)
-        clss = _val(T, space[cands], args, data)
+        curr = _val(T, space[cands], args, data)
         if maximize
-            cbst = argmax(clss)
-            if loss ≥ clss[cbst] 
+            ind = argmax(curr)
+            if loss ≥ curr[ind] 
                 break
             end
         else
-            cbst = argmin(clss)
-            if loss ≤ clss[cbst]
+            ind = argmin(curr)
+            if loss ≤ curr[ind]
                 break
             end
         end
-        best, loss = cands[cbst], clss[cbst]
+        best, loss = cands[ind], curr[ind]
         cands = _candidates(space, blst, best, k)
     end
     @debug "Finished hill-climbing"
