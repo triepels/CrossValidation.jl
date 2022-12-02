@@ -325,42 +325,63 @@ function brute(T::Type, space::ParameterSampler, args::NamedTuple, data::DataSam
     return _fit!(T(space[best]...), getdata(data), args)
 end
 
-function _candidates(space, i)
+function _candidates(space, blst, state, k)
     dim = size(space)
-    cand = sizehint!(Int[], 2 * length(dim))
-    @inbounds for j in eachindex(dim)
-        if j == 1
-            ind = mod(i - 1, dim[1]) + 1
-            if ind > 1
-                push!(cand, i - 1)
+    cands = sizehint!(Int[], 2 * k * length(dim))
+    @inbounds for i in eachindex(dim)
+        if i == 1
+            ind = mod(state - 1, dim[1]) + 1
+            for j in reverse(1:k)
+                if ind - j ≥ 1
+                    can = state - j
+                    if can ∉ blst
+                        push!(cands, can)
+                    end
+                end
             end
-            if ind < dim[1]
-                push!(cand, i + 1)
+            for j in 1:k
+                if ind + j ≤ dim[1]
+                    can = state + j
+                    if can ∉ blst
+                        push!(cands, can)
+                    end
+                end
             end
         else
-            ind = mod((i - 1) ÷ dim[j - 1], dim[j]) + 1
-            if ind > 1
-                push!(cand, i - dim[j - 1])
+            ind = mod((state - 1) ÷ dim[i - 1], dim[i]) + 1
+            for j in reverse(1:k)
+                if ind - j ≥ 1
+                    can = state - j * dim[i - 1]
+                    if can ∉ blst
+                        push!(cands, can)
+                    end
+                end
             end
-            if ind < dim[j]
-                push!(cand, i + dim[j - 1])
+            for j in 1:k
+                if ind + j ≤ dim[i]
+                    can = state + j * dim[i - 1]
+                    if can ∉ blst
+                        push!(cands, can)
+                    end
+                end
             end
         end
     end
-    return cand
+    return cands
 end
 
-function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler; maximize::Bool = true)
-    n = length(space)
-    n ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler; k::Int = 1, maximize::Bool = true)
+    m = length(space)
+    m ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    k ≥ 1 || throw(ArgumentError("cannot generate $k candidates in each direction"))
 
-    best = rand(1:n)
-    loss = maximize ? -Inf : Inf
-    cand = [best]
+    best, loss = rand(1:m), maximize ? -Inf : Inf
+    cands, blst = [best], Int[]
 
     @debug "Start hill-climbing"
-    while !isempty(cand)
-        clss = _val(T, space[cand], args, data)
+    while !isempty(cands)
+        append!(blst, cands)
+        clss = _val(T, space[cands], args, data)
         if maximize
             cbst = argmax(clss)
             if loss ≥ clss[cbst] 
@@ -372,8 +393,8 @@ function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler;
                 break
             end
         end
-        best, loss = cand[cbst], clss[cbst]
-        cand = _candidates(space, best)
+        best, loss = cands[cbst], clss[cbst]
+        cands = _candidates(space, blst, best, k)
     end
     @debug "Finished hill-climbing"
 
