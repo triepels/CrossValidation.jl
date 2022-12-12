@@ -8,6 +8,7 @@ export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWind
        ParameterSpace, ParameterSampler, GridSampler, RandomSampler,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha
 
+nobs(x::Any) = 1
 nobs(x::AbstractArray) = size(x)[end]
 
 function nobs(x::Union{Tuple, NamedTuple})
