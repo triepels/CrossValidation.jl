@@ -444,7 +444,7 @@ function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler
     arms = map(x -> T(x...), space)
     prms = collect(space)
 
-    k = ceil(Int, log2(m))
+    k = floor(Int, log2(m))
     @debug "Start successive halving"
     for i in 1:k
         args = getbudget(budget, i, k)
