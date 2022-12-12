@@ -450,7 +450,7 @@ function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler
         args = getbudget(budget, i, k)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
-        @debug "Validated arms" space=prms, args, loss
+        @debug "Validated arms" space=prms args loss
         inds = sortperm(loss, rev=maximize)
         arms = _halve!(arms[inds])
         prms = _halve!(prms[inds])
