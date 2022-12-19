@@ -7,6 +7,8 @@ struct MyModel
     b::Float64
 end
 
+MyModel(; a::Float64, b::Float64) = MyModel(a, b)
+
 function fit!(model::MyModel, x::AbstractArray; epochs::Int = 1)
     #println("Fitting $model ..."); sleep(0.1)
     return model
