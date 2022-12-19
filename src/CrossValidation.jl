@@ -294,7 +294,7 @@ loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(
 end
 
 function _val_split(T, space, args, train, test)
-    models = pmap(x -> _fit!(T(x...), train, args), space)
+    models = pmap(x -> _fit!(T(; x...), train, args), space)
     loss = map(x -> _loss(x, test), models)
     @debug "Validated models" space=collect(space) args loss
     return loss
@@ -323,7 +323,7 @@ function brute(T::Type, space::ParameterSampler, args::NamedTuple, data::DataSam
     loss = _val(T, space, args, data)
     @debug "Finished brute-force search"
     best = maximize ? argmax(loss) : argmin(loss)
-    return _fit!(T(space[best]...), getdata(data), args)
+    return _fit!(T(; space[best]...), getdata(data), args)
 end
 
 function _candidates(space, blst, state, k)
@@ -399,7 +399,7 @@ function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler;
     end
     @debug "Finished hill-climbing"
 
-    return _fit!(T(space[best]...), getdata(data), args)
+    return _fit!(T(; space[best]...), getdata(data), args)
 end
 
 abstract type Budget end
@@ -442,7 +442,7 @@ function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler
     n == 1 || throw(ArgumentError("cannot optimize by $n resample folds"))
     
     train, test = first(data)
-    arms = map(x -> T(x...), space)
+    arms = map(x -> T(; x...), space)
     prms = collect(space)
 
     k = floor(Int, log2(m))
@@ -458,7 +458,7 @@ function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler
     end
     @debug "Finished successive halving"
 
-    return _fit!(T(prms[1]...), getdata(data), getbudget(budget))
+    return _fit!(T(; prms[1]...), getdata(data), getbudget(budget))
 end
 
 end
