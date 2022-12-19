@@ -8,7 +8,7 @@ struct MyModel
 end
 
 function fit!(model::MyModel, x::AbstractArray; epochs::Int = 1)
-    println("Fitting $model ..."); sleep(0.1)
+    #println("Fitting $model ..."); sleep(0.1)
     return model
 end
 
