@@ -316,38 +316,38 @@ function neighbors(s::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
     inds = sizehint!(Int[], 2 * k * length(dim))
     @inbounds for i in eachindex(dim)
         if i == 1
-            ind = mod(ref - 1, dim[1]) + 1
+            d = mod(ref - 1, dim[1]) + 1
             for j in reverse(1:k)
-                if ind - j ≥ 1
-                    z = ref - j
-                    if z ∉ bl
-                        push!(inds, z)
+                if d - j ≥ 1
+                    ind = ref - j
+                    if ind ∉ bl
+                        push!(inds, ind)
                     end
                 end
             end
             for j in 1:k
-                if ind + j ≤ dim[1]
-                    z = ref + j
-                    if z ∉ bl
-                        push!(inds, z)
+                if d + j ≤ dim[1]
+                    ind = ref + j
+                    if ind ∉ bl
+                        push!(inds, ind)
                     end
                 end
             end
         else
-            ind = mod((ref - 1) ÷ dim[i - 1], dim[i]) + 1
+            d = mod((ref - 1) ÷ dim[i - 1], dim[i]) + 1
             for j in reverse(1:k)
-                if ind - j ≥ 1
-                    z = ref - j * dim[i - 1]
-                    if z ∉ bl
-                        push!(inds, z)
+                if d - j ≥ 1
+                    ind = ref - j * dim[i - 1]
+                    if ind ∉ bl
+                        push!(inds, ind)
                     end
                 end
             end
             for j in 1:k
-                if ind + j ≤ dim[i]
-                    z = ref + j * dim[i - 1]
-                    if z ∉ bl
-                        push!(inds, z)
+                if d + j ≤ dim[i]
+                    ind = ref + j * dim[i - 1]
+                    if ind ∉ bl
+                        push!(inds, ind)
                     end
                 end
             end
