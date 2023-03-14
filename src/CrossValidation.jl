@@ -373,14 +373,10 @@ function hc(T::Type, space::AbstractSpace, data::DataSampler, k::Int = 1, maximi
         loss = _val(T, cand, data, args)
         if maximize
             i = argmax(loss)
-            if best > loss[i]
-                break
-            end
+            loss[i] > best || break
         else
             i = argmin(loss)
-            if best < loss[i]
-                break
-            end
+            loss[i] < best || break
         end
 
         parm = cand[i]
