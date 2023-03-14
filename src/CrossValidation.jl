@@ -52,7 +52,6 @@ function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     return FixedSplit(data, n, m / n)
 end
 
-getdata(r::FixedSplit) = r.data
 Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
@@ -82,7 +81,6 @@ function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     return RandomSplit(data, n, m / n, shuffle!([1:n;]))
 end
 
-getdata(r::RandomSplit) = r.data
 Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
@@ -106,7 +104,6 @@ function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
     return KFold(data, n, k, shuffle!([1:n;]))
 end
 
-getdata(r::KFold) = r.data
 Base.length(r::KFold) = r.folds
 
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
@@ -134,8 +131,6 @@ function ForwardChaining(data::Union{AbstractArray, Tuple, NamedTuple}, init::In
     init + out ≤ n || throw(ArgumentError("initial and out-of-sample window exceed the number of data observations"))
     return ForwardChaining(data, n, init, out, partial)
 end
-
-getdata(r::ForwardChaining) = r.data
 
 function Base.length(r::ForwardChaining)
     l = (r.nobs - r.init) / r.out
@@ -165,8 +160,6 @@ function SlidingWindow(data::Union{AbstractArray, Tuple, NamedTuple}, window::In
     return SlidingWindow(data, n, window, out, partial)
 end
 
-getdata(r::SlidingWindow) = r.data
-
 function Base.length(r::SlidingWindow)
     l = (r.nobs - r.window) / r.out
     return r.partial ? ceil(Int, l) : floor(Int, l)
@@ -186,8 +179,6 @@ end
 
 Base.eltype(p::PreProcess) = eltype(p.res)
 Base.length(p::PreProcess) = length(p.res)
-
-getdata(p::PreProcess) = p.f(getdata(p.res))
 
 function Base.iterate(r::PreProcess, state = 1)
     next = iterate(r.res, state)
