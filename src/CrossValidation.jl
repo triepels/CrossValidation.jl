@@ -5,7 +5,7 @@ using Random: shuffle!
 using Distributed: @distributed, pmap
 
 export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
-       ParameterSpace, ParameterSampler, GridSampler, RandomSampler,
+       AbstractSpace, Space, Subspace, sample, neighbors,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha
 
 nobs(x::Any) = 1
@@ -187,70 +187,67 @@ function Base.iterate(r::PreProcess, state = 1)
     return r.f(train, test), state
 end
 
-struct ParameterSpace{names, T<:Tuple}
-    args::T
-end
+abstract type AbstractSpace end
 
-function ParameterSpace(; args...)
-    return ParameterSpace{keys(args), typeof(values(values(args)))}(values(values(args)))
-end
+Base.keys(s::AbstractSpace) = Base.OneTo(length(s))
 
-Base.eltype(::Type{ParameterSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
-Base.length(s::ParameterSpace) = length(s.args) == 0 ? 0 : prod(length, s.args)
-
-Base.firstindex(s::ParameterSpace) = 1
-Base.lastindex(s::ParameterSpace) = length(s)
-
-Base.size(s::ParameterSpace) = length(s.args) == 0 ? (0,) : map(length, s.args)
-
-function Base.size(s::ParameterSpace, d::Integer)
-    @boundscheck d < 1 && throw(DimensionMismatch("dimension out of range"))
-    return d > length(s.args) ? 1 : length(s.args[d])
-end
-
-@inline function Base.getindex(s::ParameterSpace{names, T}, i::Int) where {names, T}
-    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
-    strides = (1, cumprod(map(length, Base.front(s.args)))...)
-    return NamedTuple{names}(map(getindex, s.args, mod.((i - 1) .÷ strides, size(s)) .+ 1))
-end
-
-@inline function Base.getindex(s::ParameterSpace{names, T}, I::Vararg{Int, N}) where {names, T, N}
-    @boundscheck length(I) == length(s.args) && all(1 .≤ I .≤ size(s)) || throw(BoundsError(s, I))
-    return NamedTuple{names}(map(getindex, s.args, I))
-end
-
-@inline function Base.getindex(s::ParameterSpace{names, T}, inds::Vector{Int}) where {names, T}
-    return [s[i] for i in inds]
-end
-
-abstract type ParameterSampler end
-
-@propagate_inbounds function Base.iterate(s::ParameterSampler, state = 1)
+@propagate_inbounds function Base.iterate(s::AbstractSpace, state = 1)
     state > length(s) && return nothing
     return s[state], state + 1
 end
 
-# To do: add gap between elements?
-struct GridSampler <: ParameterSampler
-    space::ParameterSpace
+struct Space{names, T<:Tuple} <: AbstractSpace
+    iters::T
 end
 
-Base.eltype(s::GridSampler) = eltype(s.space)
-Base.length(s::GridSampler) = length(s.space)
+function Space(; iters...)
+    return Space{keys(iters), typeof(values(values(iters)))}(values(values(iters)))
+end
 
-@inline function Base.getindex(s::GridSampler, i::Int)
+Base.eltype(::Type{Space{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
+Base.length(s::Space) = length(s.iters) == 0 ? 0 : prod(length, s.iters)
+
+Base.firstindex(s::Space) = 1
+Base.lastindex(s::Space) = length(s)
+
+Base.size(s::Space) = length(s.iters) == 0 ? (0,) : map(length, s.iters)
+
+function Base.size(s::Space, d::Integer)
+    @boundscheck d < 1 && throw(DimensionMismatch("dimension out of range"))
+    return d > length(s.iters) ? 1 : length(s.iters[d])
+end
+
+@inline function Base.getindex(s::Space{names, T}, i::Int) where {names, T}
     @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
-    return @inbounds s.space[i]
+    strides = (1, cumprod(map(length, Base.front(s.iters)))...)
+    return NamedTuple{names}(map(getindex, s.iters, mod.((i - 1) .÷ strides, size(s)) .+ 1))
 end
 
-struct RandomSampler <: ParameterSampler
-    space::ParameterSpace
+@inline function Base.getindex(s::Space{names, T}, I::Vararg{Int, N}) where {names, T, N}
+    @boundscheck length(I) == length(s.iters) && all(1 .≤ I .≤ size(s)) || throw(BoundsError(s, I))
+    return NamedTuple{names}(map(getindex, s.iters, I))
+end
+
+@inline function Base.getindex(s::Space{names, T}, inds::Vector{Int}) where {names, T}
+    return [s[i] for i in inds]
+end
+
+struct Subspace <: AbstractSpace
+    space::AbstractSpace
     inds::Vector{Int}
 end
 
-function RandomSampler(space::ParameterSpace; n::Int = 1)
+Base.eltype(s::Subspace) = eltype(s.space)
+Base.length(s::Subspace) = length(s.inds)
+
+@inline function Base.getindex(s::Subspace, i::Int)
+    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
+    return @inbounds s.space[s.inds[i]]
+end
+
+function sample(space::AbstractSpace, n::Int = 1)
     m = length(space)
-    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from search space"))
+    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from space"))
     inds = sizehint!(Int[], n)
     for _ in 1:n
         i = rand(1:m)
@@ -259,15 +256,7 @@ function RandomSampler(space::ParameterSpace; n::Int = 1)
         end
         push!(inds, i)
     end
-    return RandomSampler(space, inds)
-end
-
-Base.eltype(s::RandomSampler) = eltype(s.space)
-Base.length(s::RandomSampler) = length(s.inds)
-
-@inline function Base.getindex(s::RandomSampler, i::Int)
-    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
-    return @inbounds s.space[s.inds[i]]
+    return Subspace(space, inds)
 end
 
 _fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
@@ -308,89 +297,99 @@ function validate(f::Function, data::DataSampler)
     return loss
 end
 
-function brute(T::Type, space::ParameterSampler, data::DataSampler, maximize::Bool = true; args...)
+function brute(T::Type, space::AbstractSpace, data::DataSampler, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
     loss = _val(T, space, data, args)
-    best = maximize ? argmax(loss) : argmin(loss)
+    ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
-    return space[best]
+    return space[ind]
 end
 
-function _candidates(space, blst, state, k)
-    dim = size(space)
-    cands = sizehint!(Int[], 2 * k * length(dim))
+function neighbors(s::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
+    @boundscheck 1 ≤ ref ≤ length(s) || throw(BoundsError(s, ref))
+    k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
+    if k > length(s)
+        return Subspace(s, setdiff(keys(s), rand(keys(s))))
+    end
+    dim = size(s)
+    inds = sizehint!(Int[], 2 * k * length(dim))
     @inbounds for i in eachindex(dim)
         if i == 1
-            ind = mod(state - 1, dim[1]) + 1
+            ind = mod(ref - 1, dim[1]) + 1
             for j in reverse(1:k)
                 if ind - j ≥ 1
-                    cand = state - j
-                    if cand ∉ blst
-                        push!(cands, cand)
+                    z = ref - j
+                    if z ∉ bl
+                        push!(inds, z)
                     end
                 end
             end
             for j in 1:k
                 if ind + j ≤ dim[1]
-                    cand = state + j
-                    if cand ∉ blst
-                        push!(cands, cand)
+                    z = ref + j
+                    if z ∉ bl
+                        push!(inds, z)
                     end
                 end
             end
         else
-            ind = mod((state - 1) ÷ dim[i - 1], dim[i]) + 1
+            ind = mod((ref - 1) ÷ dim[i - 1], dim[i]) + 1
             for j in reverse(1:k)
                 if ind - j ≥ 1
-                    cand = state - j * dim[i - 1]
-                    if cand ∉ blst
-                        push!(cands, cand)
+                    z = ref - j * dim[i - 1]
+                    if z ∉ bl
+                        push!(inds, z)
                     end
                 end
             end
             for j in 1:k
                 if ind + j ≤ dim[i]
-                    cand = state + j * dim[i - 1]
-                    if cand ∉ blst
-                        push!(cands, cand)
+                    z = ref + j * dim[i - 1]
+                    if z ∉ bl
+                        push!(inds, z)
                     end
                 end
             end
         end
     end
-    return cands
+    return Subspace(s, inds)
 end
 
-function hc(T::Type, space::ParameterSpace, data::DataSampler, k::Int = 1, maximize::Bool = true; args...)
-    m = length(space)
-    m ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    k ≥ 1 || throw(ArgumentError("cannot generate $k candidates in each direction"))
+neighbors(s::Subspace, ref::Int, k::Int, bl::Vector{Int} = Int[]) = neighbors(s.space, s.inds[ref], k, bl)
 
-    best, loss = rand(1:m), maximize ? -Inf : Inf
-    cands, blst = [best], Int[]
+function hc(T::Type, space::Space, data::DataSampler, k::Int = 1, maximize::Bool = true; args...)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
-    @debug "Start hill-climbing"
-    while !isempty(cands)
-        append!(blst, cands)
-        curr = _val(T, space[cands], data, args)
+    bl = Int[]
+    parm = nothing
+    best = maximize ? -Inf : Inf
+
+    cand = sample(space, 1)
+
+    while !isempty(cand)
+        append!(bl, cand.inds)
+
+        loss = _val(T, cand, data, args)
         if maximize
-            ind = argmax(curr)
-            if loss ≥ curr[ind] 
+            i = argmax(loss)
+            if best > loss[i]
                 break
             end
         else
-            ind = argmin(curr)
-            if loss ≤ curr[ind]
+            i = argmin(loss)
+            if best < loss[i]
                 break
             end
         end
-        best, loss = cands[ind], curr[ind]
-        cands = _candidates(space, blst, best, k)
-    end
-    @debug "Finished hill-climbing"
 
-    return space[best]
+        parm = cand[i]
+        best = loss[i]
+
+        cand = neighbors(cand, i, k, bl)
+    end
+
+    return parm
 end
 
 abstract type Budget end
@@ -427,7 +426,7 @@ end
 
 _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
 
-function sha(T::Type, space::ParameterSampler, data::DataSampler, budget::Budget, maximize::Bool = true)
+function sha(T::Type, space::AbstractSpace, data::DataSampler, budget::Budget, maximize::Bool = true)
     m, n = length(space), length(data)
     m ≥ 1 || throw(ArgumentError("nothing to optimize"))
     n == 1 || throw(ArgumentError("cannot optimize by $n resample folds"))
