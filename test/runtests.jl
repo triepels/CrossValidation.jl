@@ -22,38 +22,38 @@ end
 
 x = rand(2, 100)
 
-validate(MyModel(2.0, 2.0), (epochs=100,), FixedSplit(x))
-validate(MyModel(2.0, 2.0), (epochs=100,), RandomSplit(x))
-validate(MyModel(2.0, 2.0), (epochs=100,), KFold(x))
-validate(MyModel(2.0, 2.0), (epochs=100,), ForwardChaining(x, 40, 10))
-validate(MyModel(2.0, 2.0), (epochs=100,), SlidingWindow(x, 40, 10))
+validate(MyModel(2.0, 2.0), FixedSplit(x), epochs=100)
+validate(MyModel(2.0, 2.0), RandomSplit(x), epochs=100)
+validate(MyModel(2.0, 2.0), KFold(x), epochs=100)
+validate(MyModel(2.0, 2.0), ForwardChaining(x, 40, 10), epochs=100)
+validate(MyModel(2.0, 2.0), SlidingWindow(x, 40, 10), epochs=100)
 
 space = ParameterSpace(a = -6.0:0.5:6.0, b = -6.0:0.5:6.0)
 
-brute(MyModel, GridSampler(space), (epochs=100,), FixedSplit(x), maximize=false)
-brute(MyModel, RandomSampler(space, n=100), (epochs=100,), FixedSplit(x), maximize=false)
-hc(MyModel, space, (epochs=100,), FixedSplit(x), k=1, maximize=false)
+brute(MyModel, GridSampler(space), FixedSplit(x), false, epochs=100)
+brute(MyModel, RandomSampler(space, n=100), FixedSplit(x), false, epochs=100)
+hc(MyModel, space, FixedSplit(x), 1, false, epochs=100)
 
-sha(MyModel, GridSampler(space), ConstantBudget((epochs=100,)), FixedSplit(x), maximize=false)
-sha(MyModel, RandomSampler(space, n=100), GeometricBudget((epochs=100,), 1.5), FixedSplit(x), maximize=false)
+sha(MyModel, GridSampler(space), FixedSplit(x), ConstantBudget((epochs=100,)), false)
+sha(MyModel, RandomSampler(space, n=100), FixedSplit(x), GeometricBudget((epochs=100,), 1.5), false)
 
 f(train) = train ./ 10
 f(train, test) = train ./ 10, test ./ 10
 
-validate(MyModel(2.0, 2.0), (epochs=100,), PreProcess(FixedSplit(x), f))
-brute(MyModel, RandomSampler(space, n=100), (epochs=100,), PreProcess(KFold(x), f), maximize=false)
+validate(MyModel(2.0, 2.0), PreProcess(FixedSplit(x), f), epochs=100)
+brute(MyModel, RandomSampler(space, n=100), PreProcess(KFold(x), f), false, epochs=100)
 
 validate(KFold(x)) do train
-    prms = brute(MyModel, GridSampler(space), (epochs=100,), FixedSplit(train), maximize=false)
+    prms = brute(MyModel, GridSampler(space), FixedSplit(train), false, epochs=100)
     return fit!(MyModel(prms...), train)
 end
 
 validate(KFold(x)) do train
-    prms = hc(MyModel, space, (epochs=100,), FixedSplit(train), maximize=false)
+    prms = hc(MyModel, space, FixedSplit(train), 1, false, epochs=100)
     return fit!(MyModel(prms...), train)
 end
 
 validate(KFold(x)) do train
-    prms = sha(MyModel, GridSampler(space), ConstantBudget((epochs=100,)), FixedSplit(train), maximize=false)
+    prms = sha(MyModel, GridSampler(space), FixedSplit(train), ConstantBudget((epochs=100,)), false)
     return fit!(MyModel(prms...), train)
 end

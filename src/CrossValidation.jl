@@ -280,18 +280,18 @@ _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
 loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(model))"))
 
-@inline function _val(T, space, args, data)
-    return sum(x -> _val_split(T, space, args, x...), data) / length(data)
+@inline function _val(T, space, data, args)
+    return sum(x -> _val_split(T, space, x..., args), data) / length(data)
 end
 
-function _val_split(T, space, args, train, test)
+function _val_split(T, space, train, test, args)
     models = pmap(x -> _fit!(T(; x...), train, args), space)
     loss = map(x -> _loss(x, test), models)
     @debug "Validated models" space=collect(space) args loss
     return loss
 end
 
-function validate(model::Any, args::NamedTuple, data::DataSampler)
+function validate(model, data::DataSampler; args...)
     @debug "Start model validation"
     loss = map(x -> _loss(_fit!(model, x[1], args), x[2]), data)
     @debug "Finished model validation"
@@ -308,10 +308,10 @@ function validate(f::Function, data::DataSampler)
     return loss
 end
 
-function brute(T::Type, space::ParameterSampler, args::NamedTuple, data::DataSampler; maximize::Bool = true)
+function brute(T::Type, space::ParameterSampler, data::DataSampler, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
-    loss = _val(T, space, args, data)
+    loss = _val(T, space, data, args)
     best = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     return space[best]
@@ -362,7 +362,7 @@ function _candidates(space, blst, state, k)
     return cands
 end
 
-function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler; k::Int = 1, maximize::Bool = true)
+function hc(T::Type, space::ParameterSpace, data::DataSampler, k::Int = 1, maximize::Bool = true; args...)
     m = length(space)
     m ≥ 1 || throw(ArgumentError("nothing to optimize"))
     k ≥ 1 || throw(ArgumentError("cannot generate $k candidates in each direction"))
@@ -373,7 +373,7 @@ function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler;
     @debug "Start hill-climbing"
     while !isempty(cands)
         append!(blst, cands)
-        curr = _val(T, space[cands], args, data)
+        curr = _val(T, space[cands], data, args)
         if maximize
             ind = argmax(curr)
             if loss ≥ curr[ind] 
@@ -427,7 +427,7 @@ end
 
 _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
 
-function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler; maximize::Bool = true)
+function sha(T::Type, space::ParameterSampler, data::DataSampler, budget::Budget, maximize::Bool = true)
     m, n = length(space), length(data)
     m ≥ 1 || throw(ArgumentError("nothing to optimize"))
     n == 1 || throw(ArgumentError("cannot optimize by $n resample folds"))
