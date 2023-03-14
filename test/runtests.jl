@@ -44,16 +44,16 @@ validate(MyModel(2.0, 2.0), PreProcess(FixedSplit(x), f), epochs=100)
 brute(MyModel, sample(space, 100), PreProcess(KFold(x), f), false, epochs=100)
 
 validate(KFold(x)) do train
-    prms = brute(MyModel, space, FixedSplit(train), false, epochs=100)
-    return fit!(MyModel(prms...), train)
+    parms = brute(MyModel, space, FixedSplit(train), false, epochs=100)
+    return fit!(MyModel(parms...), train)
 end
 
 validate(KFold(x)) do train
-    prms = hc(MyModel, space, FixedSplit(train), 1, false, epochs=100)
-    return fit!(MyModel(prms...), train)
+    parms = hc(MyModel, space, FixedSplit(train), 1, false, epochs=100)
+    return fit!(MyModel(parms...), train)
 end
 
 validate(KFold(x)) do train
-    prms = sha(MyModel, space, FixedSplit(train), ConstantBudget((epochs=100,)), false)
-    return fit!(MyModel(prms...), train)
+    parms = sha(MyModel, space, FixedSplit(train), ConstantBudget((epochs=100,)), false)
+    return fit!(MyModel(parms...), train)
 end
