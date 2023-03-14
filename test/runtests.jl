@@ -43,6 +43,17 @@ f(train, test) = train ./ 10, test ./ 10
 validate(MyModel(2.0, 2.0), (epochs=100,), PreProcess(FixedSplit(x), f))
 brute(MyModel, RandomSampler(space, n=100), (epochs=100,), PreProcess(KFold(x), f), maximize=false)
 
-validate(x -> brute(MyModel, GridSampler(space), (epochs=100,), FixedSplit(x), maximize=false), KFold(x))
-validate(x -> hc(MyModel, space, (epochs=100,), FixedSplit(x), maximize=false), KFold(x))
-validate(x -> sha(MyModel, GridSampler(space), ConstantBudget((epochs=100,)), FixedSplit(x), maximize=false), KFold(x))
+validate(KFold(x)) do train
+    prms = brute(MyModel, GridSampler(space), (epochs=100,), FixedSplit(train), maximize=false)
+    return fit!(MyModel(prms...), train)
+end
+
+validate(KFold(x)) do train
+    prms = hc(MyModel, space, (epochs=100,), FixedSplit(train), maximize=false)
+    return fit!(MyModel(prms...), train)
+end
+
+validate(KFold(x)) do train
+    prms = sha(MyModel, GridSampler(space), ConstantBudget((epochs=100,)), FixedSplit(train), maximize=false)
+    return fit!(MyModel(prms...), train)
+end

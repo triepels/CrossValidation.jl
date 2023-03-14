@@ -321,9 +321,9 @@ function brute(T::Type, space::ParameterSampler, args::NamedTuple, data::DataSam
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
     loss = _val(T, space, args, data)
-    @debug "Finished brute-force search"
     best = maximize ? argmax(loss) : argmin(loss)
-    return _fit!(T(; space[best]...), getdata(data), args)
+    @debug "Finished brute-force search"
+    return space[best]
 end
 
 function _candidates(space, blst, state, k)
@@ -399,7 +399,7 @@ function hc(T::Type, space::ParameterSpace, args::NamedTuple, data::DataSampler;
     end
     @debug "Finished hill-climbing"
 
-    return _fit!(T(; space[best]...), getdata(data), args)
+    return space[best]
 end
 
 abstract type Budget end
@@ -458,7 +458,7 @@ function sha(T::Type, space::ParameterSampler, budget::Budget, data::DataSampler
     end
     @debug "Finished successive halving"
 
-    return _fit!(T(; prms[1]...), getdata(data), getbudget(budget))
+    return prms[1]
 end
 
 end
