@@ -356,8 +356,6 @@ function neighbors(s::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
     return Subspace(s, inds)
 end
 
-neighbors(s::Subspace, ref::Int, k::Int, bl::Vector{Int} = Int[]) = neighbors(s.space, s.inds[ref], k, bl)
-
 function hc(T::Type, space::AbstractSpace, data::DataSampler, k::Int = 1, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
@@ -382,7 +380,7 @@ function hc(T::Type, space::AbstractSpace, data::DataSampler, k::Int = 1, maximi
         parm = cand[i]
         best = loss[i]
 
-        cand = neighbors(cand, i, k, bl)
+        cand = neighbors(space, cand.inds[i], k, bl)
     end
 
     return parm
