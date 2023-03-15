@@ -386,53 +386,51 @@ function hc(T::Type, space::AbstractSpace, data::AbstractResampler, k::Int = 1, 
     return parm
 end
 
-abstract type Budget end
+abstract type AbstractBudget end
 
 _cast(T::Type{A}, x::Integer) where A <: AbstractFloat = T(x)
 _cast(T::Type{A}, x::AbstractFloat) where A <: Integer = floor(T, x)
 _cast(T::Type{A}, x::Number) where A <: Number = x
 
-struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: Budget
-    args::NamedTuple{names, T}
+struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
+    args::T
 end
 
-getbudget(b::ConstantBudget) = b.args
-
-function getbudget(b::ConstantBudget, i::Int, n::Int)
-    return map(x -> _cast(typeof(x), x / n), b.args)
+function ConstantBudget(; args...)
+    return ConstantBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: Budget
-    args::NamedTuple{names, T}
-    rate::Number
+function getbudget(b::ConstantBudget{names}, rate::Number, i::Int, n::Int) where names
+    return NamedTuple{names}(map(x -> _cast(typeof(x), x / n), b.args))
 end
 
-function GeometricBudget(args::NamedTuple{names, T}; rate::Number = 2) where {names, T<:Tuple{Vararg{Number}}}
-    return GeometricBudget(args, rate)
+struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
+    args::T
 end
 
-getbudget(b::GeometricBudget) = b.args
+function GeometricBudget(; args...)
+    return GeometricBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
+end
 
-function getbudget(b::GeometricBudget, i::Int, n::Int)
-    r = b.rate
-    return map(x -> _cast(typeof(x), r^(i - 1) * x * (r - 1) / (r^n - 1)), b.args)
+function getbudget(b::GeometricBudget{names}, rate::Number, i::Int, n::Int) where names
+    return NamedTuple{names}(map(x -> _cast(typeof(x), rate^(i - 1) * x * (rate - 1) / (rate^n - 1)), b.args))
 end
 
 _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
 
-function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Budget, maximize::Bool = true)
-    m, n = length(space), length(data)
-    m ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    n == 1 || throw(ArgumentError("cannot optimize by $n resample folds"))
-    
+function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
+    0 < rate < 1 || throw(ArgumentError("unable to halve arms with rate $rate"))
+
     train, test = first(data)
     arms = map(x -> T(; x...), space)
     prms = collect(space)
 
-    k = floor(Int, log2(m))
+    n = floor(Int, log(1 / rate, length(space)))
     @debug "Start successive halving"
-    for i in 1:k
-        args = getbudget(budget, i, k)
+    for i in 1:n
+        args = getbudget(budget, rate, i, n)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" space=prms args loss
@@ -442,7 +440,7 @@ function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Bud
     end
     @debug "Finished successive halving"
 
-    return prms[1]
+    return first(prms)
 end
 
 end
