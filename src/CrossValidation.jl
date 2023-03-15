@@ -306,13 +306,13 @@ function brute(T::Type, space::AbstractSpace, data::DataSampler, maximize::Bool 
     return space[ind]
 end
 
-function neighbors(s::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
-    @boundscheck 1 ≤ ref ≤ length(s) || throw(BoundsError(s, ref))
+function neighbors(space::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
+    @boundscheck 1 ≤ ref ≤ length(space) || throw(BoundsError(space, ref))
     k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
-    if k > length(s)
-        return Subspace(s, setdiff(keys(s), rand(keys(s))))
+    if k > length(space)
+        return Subspace(space, setdiff(keys(space), rand(keys(space))))
     end
-    dim = size(s)
+    dim = size(space)
     inds = sizehint!(Int[], 2 * k * length(dim))
     @inbounds for i in eachindex(dim)
         if i == 1
@@ -353,7 +353,7 @@ function neighbors(s::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
             end
         end
     end
-    return Subspace(s, inds)
+    return Subspace(space, inds)
 end
 
 function hc(T::Type, space::AbstractSpace, data::DataSampler, k::Int = 1, maximize::Bool = true; args...)
