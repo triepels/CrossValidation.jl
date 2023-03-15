@@ -30,11 +30,11 @@ restype(x::NamedTuple) = NamedTuple{keys(x), Tuple{map(restype, x)...}}
 restype(x::AbstractArray) = Array{eltype(x), ndims(x)}
 restype(x::Any) = typeof(x)
 
-abstract type DataSampler end
+abstract type AbstractResampler end
 
-Base.eltype(r::DataSampler) = Tuple{restype(r.data), restype(r.data)}
+Base.eltype(r::AbstractResampler) = Tuple{restype(r.data), restype(r.data)}
 
-struct FixedSplit{D} <: DataSampler
+struct FixedSplit{D} <: AbstractResampler
     data::D
     nobs::Int
     ratio::Number
@@ -62,7 +62,7 @@ Base.length(r::FixedSplit) = 1
     return (train, test), state + 1
 end
 
-struct RandomSplit{D} <: DataSampler
+struct RandomSplit{D} <: AbstractResampler
     data::D
     nobs::Int
     ratio::Number
@@ -91,7 +91,7 @@ Base.length(r::RandomSplit) = 1
     return (train, test), state + 1
 end
 
-struct KFold{D} <: DataSampler
+struct KFold{D} <: AbstractResampler
     data::D
     nobs::Int
     folds::Int
@@ -116,7 +116,7 @@ Base.length(r::KFold) = r.folds
     return (train, test), state + 1
 end
 
-struct ForwardChaining{D} <: DataSampler
+struct ForwardChaining{D} <: AbstractResampler
     data::D
     nobs::Int
     init::Int
@@ -144,7 +144,7 @@ end
     return (train, test), state + 1
 end
 
-struct SlidingWindow{D} <: DataSampler
+struct SlidingWindow{D} <: AbstractResampler
     data::D
     nobs::Int
     window::Int
@@ -172,8 +172,8 @@ end
     return (train, test), state + 1
 end
 
-struct PreProcess <: DataSampler
-    res::DataSampler
+struct PreProcess <: AbstractResampler
+    res::AbstractResampler
     f::Function
 end
 
@@ -280,7 +280,7 @@ function _val_split(T, space, train, test, args)
     return loss
 end
 
-function validate(model, data::DataSampler; args...)
+function validate(model, data::AbstractResampler; args...)
     @debug "Start model validation"
     loss = map(x -> _loss(_fit!(model, x[1], args), x[2]), data)
     @debug "Finished model validation"
@@ -290,14 +290,14 @@ end
 _f(f, x::AbstractArray) = f(x)
 _f(f, x::Union{Tuple, NamedTuple}) = f(x...)
 
-function validate(f::Function, data::DataSampler)
+function validate(f::Function, data::AbstractResampler)
     @debug "Start model validation"
     loss = map(x -> _loss(_f(f, x[1]), x[2]), data)
     @debug "Finished model validation"
     return loss
 end
 
-function brute(T::Type, space::AbstractSpace, data::DataSampler, maximize::Bool = true; args...)
+function brute(T::Type, space::AbstractSpace, data::AbstractResampler, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
     loss = _val(T, space, data, args)
@@ -356,7 +356,7 @@ function neighbors(space::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
     return Subspace(space, inds)
 end
 
-function hc(T::Type, space::AbstractSpace, data::DataSampler, k::Int = 1, maximize::Bool = true; args...)
+function hc(T::Type, space::AbstractSpace, data::AbstractResampler, k::Int = 1, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
     bl = Int[]
@@ -420,7 +420,7 @@ end
 
 _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
 
-function sha(T::Type, space::AbstractSpace, data::DataSampler, budget::Budget, maximize::Bool = true)
+function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Budget, maximize::Bool = true)
     m, n = length(space), length(data)
     m ≥ 1 || throw(ArgumentError("nothing to optimize"))
     n == 1 || throw(ArgumentError("cannot optimize by $n resample folds"))
