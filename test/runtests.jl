@@ -37,6 +37,8 @@ hc(MyModel, space, FixedSplit(x), 1, false, epochs=100)
 sha(MyModel, space, FixedSplit(x), ConstantBudget(epochs=100), 0.5, false)
 sha(MyModel, sample(space, 100), FixedSplit(x), GeometricBudget(epochs=100), 0.5, false)
 
+sasha(MyModel, space, FixedSplit(x), 1, false, epochs=1)
+
 f(train) = train ./ 10
 f(train, test) = train ./ 10, test ./ 10
 
@@ -55,5 +57,10 @@ end
 
 validate(KFold(x)) do train
     parms = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs=100), 0.5, false)
+    return fit!(MyModel(parms...), train)
+end
+
+validate(KFold(x)) do train
+    parms = sasha(MyModel, space, FixedSplit(train), 1, false, epochs=1)
     return fit!(MyModel(parms...), train)
 end

@@ -6,7 +6,7 @@ using Distributed: @distributed, pmap
 
 export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
        AbstractSpace, Space, Subspace, sample, neighbors,
-       fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha
+       fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha, sasha
 
 nobs(x::Any) = 1
 nobs(x::AbstractArray) = size(x)[end]
@@ -434,11 +434,44 @@ function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Abs
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" space=prms args loss
+        
         inds = sortperm(loss, rev=maximize)
         arms = _halve!(arms[inds])
         prms = _halve!(prms[inds])
     end
     @debug "Finished successive halving"
+
+    return first(prms)
+end
+
+function sasha(T::Type, space::AbstractSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
+    0 ≤ temp  || throw(ArgumentError("initial temperature must be positive"))
+
+    train, test = first(data)
+    arms = map(x -> T(; x...), space)
+    prms = collect(space)
+
+    i = 1
+    while length(arms) > 1
+        arms = pmap(x -> _fit!(x, train, args), arms)
+        loss = map(x -> _loss(x, test), arms)
+        
+        if maximize
+            prob = exp.(i .* (loss .- max(loss...)) ./ temp)
+        else
+            prob = exp.(-i .* (loss .- min(loss...)) ./ temp)
+        end
+
+        @debug "Validated arms" space=prms prob loss
+
+        inds = findall(rand(length(prob)) .≤ prob)
+        arms = arms[inds]
+        prms = prms[inds]
+
+        i += 1
+    end
 
     return first(prms)
 end
