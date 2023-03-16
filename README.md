@@ -33,19 +33,19 @@ julia> function loss(model::MyModel, data)
 # Features
 Model validation based on various resample methods:
 ```julia
-julia> validate(MyModel(...), KFold(data), epochs = 100)
+julia> validate(MyModel(parms), KFold(data), args)
 ```
 
 Hyperparameter optimization using various optimizers.
 ```julia
 julia> space = Space(a = -6.0:0.5:6.0, b = -6.0:0.5:6.0)
-julia> sha(MyModel, space, FixedSplit(data), GeometricBudget(epochs = 100), 0.5, false)
+julia> sha(MyModel, space, FixedSplit(data), GeometricBudget(args), 0.5, false)
 ```
 
 Model validation with hyperparameter optimization:
 ```julia
 julia> validate(KFold(data)) do train
-           parms = brute(MyModel, space, FixedSplit(train), false, epochs = 100)
+           parms = brute(MyModel, space, FixedSplit(train), false, args)
            return fit!(MyModel(parms...), train)
        end
 ```
