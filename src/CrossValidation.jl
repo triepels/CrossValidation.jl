@@ -276,11 +276,11 @@ end
 function _val_split(T, space, train, test, args)
     models = pmap(x -> _fit!(T(; x...), train, args), space)
     loss = map(x -> _loss(x, test), models)
-    @debug "Validated models" space=collect(space) args loss
+    @debug "Validated models" parms=collect(space) args loss
     return loss
 end
 
-function validate(model, data::AbstractResampler; args...)
+function validate(model::Any, data::AbstractResampler; args...)
     @debug "Start model validation"
     loss = map(x -> _loss(_fit!(model, x[1], args), x[2]), data)
     @debug "Finished model validation"
@@ -425,7 +425,7 @@ function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Abs
 
     train, test = first(data)
     arms = map(x -> T(; x...), space)
-    prms = collect(space)
+    parms = collect(space)
 
     n = floor(Int, log(1 / rate, length(space)))
     @debug "Start successive halving"
@@ -433,15 +433,15 @@ function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Abs
         args = getbudget(budget, rate, i, n)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
-        @debug "Validated arms" space=prms args loss
+        @debug "Validated arms" parms args loss
         
         inds = sortperm(loss, rev=maximize)
         arms = _halve!(arms[inds])
-        prms = _halve!(prms[inds])
+        parms = _halve!(parms[inds])
     end
     @debug "Finished successive halving"
 
-    return first(prms)
+    return first(parms)
 end
 
 function sasha(T::Type, space::AbstractSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
@@ -451,7 +451,7 @@ function sasha(T::Type, space::AbstractSpace, data::AbstractResampler, temp::Num
 
     train, test = first(data)
     arms = map(x -> T(; x...), space)
-    prms = collect(space)
+    parms = collect(space)
 
     i = 1
     while length(arms) > 1
@@ -464,16 +464,16 @@ function sasha(T::Type, space::AbstractSpace, data::AbstractResampler, temp::Num
             prob = exp.(-i .* (loss .- min(loss...)) ./ temp)
         end
 
-        @debug "Validated arms" space=prms prob loss
+        @debug "Validated arms" parms prob loss
 
         inds = findall(rand(length(prob)) .≤ prob)
         arms = arms[inds]
-        prms = prms[inds]
+        parms = parms[inds]
 
         i += 1
     end
 
-    return first(prms)
+    return first(parms)
 end
 
 end
