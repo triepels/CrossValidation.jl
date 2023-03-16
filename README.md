@@ -8,7 +8,13 @@ Run the following code to install the package:
 ```
 
 # Get Started
-You have to define functions `fit!` and `loss` for your own model type. Function `fit!` takes a model and fits it on some data based on some optional fitting arguments:
+You have to define functions `fit!` and `loss` for your model type:
+
+```julia
+julia> import CrossValidation: fit!, loss
+```
+
+Function `fit!` takes a model and fits it on data based on some optional fitting arguments:
 
 ```julia
 julia> function fit!(model::MyModel, data; args)
