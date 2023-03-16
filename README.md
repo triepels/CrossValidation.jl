@@ -1,5 +1,5 @@
 # Description
-Provides simple and lightweight implementations of model validation and hyperparameter search for Julia. 
+Provides simple and lightweight implementations of model validation and hyperparameter optimization for Julia. 
 
 # Features
 Model validation based on various resample methods:
