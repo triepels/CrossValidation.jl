@@ -8,7 +8,7 @@ Run the following code to install the package:
 ```
 
 # Get Started
-You have to define functions `fit!` and `loss` for your model type:
+You have to define functions `fit!` and `loss` for your model type.
 
 ```julia
 julia> import CrossValidation: fit!, loss
