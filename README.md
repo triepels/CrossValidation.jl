@@ -33,7 +33,7 @@ julia> function loss(model::MyModel, data)
 # Features
 Model validation based on various resample methods:
 ```julia
-julia> validate(MyModel(2.0, 2.0), KFold(data), epochs = 100)
+julia> validate(MyModel(...), KFold(data), epochs = 100)
 ```
 
 Hyperparameter optimization using various optimizers.
