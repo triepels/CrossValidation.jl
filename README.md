@@ -1,6 +1,29 @@
 # Description
 Provides simple and lightweight implementations of model validation and hyperparameter optimization for Julia. 
 
+# Installation
+Run the following code to install the package:
+```julia
+] add https://github.com/triepels/CrossValidation.jl
+```
+
+# Get Started
+You have to define functions `fit!` and `loss` for your own model type. Function `fit!` takes a model and fits it on some data based on some optional fitting arguments:
+
+```julia
+julia> function fit!(model::MyModel, data; args)
+           // Code to fit model...
+       end
+```
+
+Function `loss` estimates how well the model performs on (out-of-sample) data:
+
+```julia
+julia> function loss(model::MyModel, data)
+           // Code to evalute loss of the model...
+       end
+```
+
 # Features
 Model validation based on various resample methods:
 ```julia
@@ -36,12 +59,6 @@ The following optimizers are available:
 * Hill-Climbing (HC)
 * Successive Halving (SHA)
 * Simulated Annealing and Successive Halving (SASHA)
-
-# Installation
-Run the following code to install the package:
-```julia
-] add https://github.com/triepels/CrossValidation.jl
-```
 
 # Note
 This package is not yet stable. Future releases might be subject to breaking changes.
