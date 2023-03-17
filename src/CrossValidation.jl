@@ -107,7 +107,7 @@ end
 Base.length(r::KFold) = r.folds
 
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
-    state > r.folds && return nothing
+    state > length(r) && return nothing
     m = mod(r.nobs, r.folds)
     w = floor(Int, r.nobs / r.folds)
     fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
