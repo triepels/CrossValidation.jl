@@ -94,7 +94,7 @@ end
 struct KFold{D} <: AbstractResampler
     data::D
     nobs::Int
-    folds::Int
+    k::Int
     perm::Vector{Int}
 end
 
@@ -104,12 +104,12 @@ function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
     return KFold(data, n, k, shuffle!([1:n;]))
 end
 
-Base.length(r::KFold) = r.folds
+Base.length(r::KFold) = r.k
 
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
     state > length(r) && return nothing
-    m = mod(r.nobs, r.folds)
-    w = floor(Int, r.nobs / r.folds)
+    m = mod(r.nobs, r.k)
+    w = floor(Int, r.nobs / r.k)
     fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
     train = getobs(r.data, r.perm[1:end .∉ Ref(fold)])
     test = getobs(r.data, r.perm[fold])
