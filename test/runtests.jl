@@ -21,9 +21,11 @@ function loss(model::MyModel, x::AbstractArray)
 end
 
 x = rand(2, 100)
+c = rand(1:4, 100)
 
 validate(MyModel(2.0, 2.0), FixedSplit(x), epochs = 100)
 validate(MyModel(2.0, 2.0), RandomSplit(x), epochs = 100)
+validate(MyModel(2.0, 2.0), CatagoricalSplit(x, c), epochs = 100)
 validate(MyModel(2.0, 2.0), KFold(x), epochs = 100)
 validate(MyModel(2.0, 2.0), ForwardChaining(x, 40, 10), epochs = 100)
 validate(MyModel(2.0, 2.0), SlidingWindow(x, 40, 10), epochs = 100)
