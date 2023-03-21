@@ -53,7 +53,11 @@ function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
 end
 
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ind::Any)
-    return FixedSplit(data, nobs(data), ind)
+    n = nobs(data)
+    @boundscheck for i in ind
+        i ∈ 1:n || throw(BoundsError(data, i))
+    end
+    return FixedSplit(data, n, ind)
 end
 
 Base.length(r::FixedSplit) = 1
