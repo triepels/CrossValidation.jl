@@ -175,7 +175,7 @@ end
 
 @propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.data, OneTo((r.init + (state - 1) * r.out)))
+    train = getobs(r.data, OneTo(r.init + (state - 1) * r.out))
     test = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, r.nobs))
     return (train, test), state + 1
 end
