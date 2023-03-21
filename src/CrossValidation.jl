@@ -68,29 +68,28 @@ end
 struct RandomSplit{D} <: AbstractResampler
     data::D
     nobs::Int
-    ratio::Number
+    m::Int
     perm::Vector{Int}
 end
 
 function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
     n = nobs(data)
-    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return RandomSplit(data, n, ratio, shuffle!([1:n;]))
+    0 < ratio * n < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
+    return RandomSplit(data, n, ceil(Int, ratio * n), shuffle!([1:n;]))
 end
 
 function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     n = nobs(data)
-    1 ≤ m ≤ n - 1 || throw(ArgumentError("data cannot be split by $m"))
-    return RandomSplit(data, n, m / n, shuffle!([1:n;]))
+    0 < m < n || throw(ArgumentError("data cannot be split by $m"))
+    return RandomSplit(data, n, m, shuffle!([1:n;]))
 end
 
 Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > 1 && return nothing
-    m = ceil(Int, r.ratio * r.nobs)
-    train = getobs(r.data, r.perm[1:m])
-    test = getobs(r.data, r.perm[(m + 1):r.nobs])
+    train = getobs(r.data, r.perm[1:r.m])
+    test = getobs(r.data, r.perm[(r.m + 1):r.nobs])
     return (train, test), state + 1
 end
 
