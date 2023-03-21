@@ -41,7 +41,6 @@ sha(MyModel, sample(space, 100), FixedSplit(x), GeometricBudget(epochs = 100), 0
 
 sasha(MyModel, space, FixedSplit(x), 1, false, epochs = 1)
 
-f(train) = train ./ 10
 f(train, test) = train ./ 10, test ./ 10
 
 validate(MyModel(2.0, 2.0), PreProcess(FixedSplit(x), f), epochs = 100)
