@@ -97,6 +97,36 @@ Base.length(r::RandomSplit) = 1
     return (train, test), state + 1
 end
 
+struct CatagoricalSplit{D,C} <: AbstractResampler
+    data::D
+    nobs::Int
+    inds::Dict{C, Vector{Int}}
+end
+
+function CatagoricalSplit(data::Union{AbstractArray, Tuple, NamedTuple}, categories::T) where T <: AbstractArray
+    n = nobs(data)
+    length(categories) == n || throw(ArgumentError("number of observations and categories do not match"))
+    inds = Dict{eltype(categories), Vector{Int}}()
+    for (i, x) in enumerate(categories)
+        if !haskey(inds, x)
+            push!(inds, x => [i])
+        else
+            push!(inds[x], i)
+        end
+    end
+    return CatagoricalSplit(data, n, inds)
+end
+
+Base.length(r::CatagoricalSplit) = length(r.inds)
+
+@propagate_inbounds function Base.iterate(r::CatagoricalSplit, state = 1)
+    state > length(r) && return nothing
+    key = first(iterate(keys(r.inds), state))
+    train = getobs(r.data, r.inds[key])
+    test = getobs(r.data, setdiff(1:r.nobs, r.inds[key]))
+    return (train, test), state + 1
+end
+
 struct KFold{D} <: AbstractResampler
     data::D
     nobs::Int
