@@ -52,16 +52,17 @@ julia> validate(KFold(data)) do train
 
 # Resample methods
 The following resample methods are available:
-* Fixed split
-* Random split (holdout)
+* Fixed Split
+* Random Split (holdout)
+* Catagorical Split
 * K-fold
-* Forward chaining
-* Sliding window
+* Forward Chaining
+* Sliding Window
 
 # Optimizers
 The following optimizers are available:
-* Grid search
-* Random search
+* Grid Search
+* Random Search
 * Hill-Climbing (HC)
 * Successive Halving (SHA)
 * Simulated Annealing and Successive Halving (SASHA)
