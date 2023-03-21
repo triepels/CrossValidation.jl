@@ -1,6 +1,6 @@
 module CrossValidation
 
-using Base: @propagate_inbounds
+using Base: @propagate_inbounds, OneTo
 using Random: shuffle!
 using Distributed: @distributed, pmap
 
@@ -43,13 +43,13 @@ end
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
     n = nobs(data)
     0 < n * ratio < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return FixedSplit(data, n, Base.OneTo(ceil(Int, n * ratio)))
+    return FixedSplit(data, n, OneTo(ceil(Int, n * ratio)))
 end
 
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     n = nobs(data)
     0 < m < n || throw(ArgumentError("data cannot be split by $m"))
-    return FixedSplit(data, n, Base.OneTo(m))
+    return FixedSplit(data, n, OneTo(m))
 end
 
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, inds::Any)
@@ -225,7 +225,7 @@ end
 
 abstract type AbstractSpace end
 
-Base.keys(s::AbstractSpace) = Base.OneTo(length(s))
+Base.keys(s::AbstractSpace) = OneTo(length(s))
 
 @propagate_inbounds function Base.iterate(s::AbstractSpace, state = 1)
     state > length(s) && return nothing
