@@ -55,7 +55,7 @@ end
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, inds::Any)
     n = nobs(data)
     @boundscheck for i in inds
-        i ∈ 1:n || throw(BoundsError(data, i))
+        i ∈ OneTo(n) || throw(BoundsError(data, i))
     end
     return FixedSplit(data, n, inds)
 end
@@ -65,7 +65,7 @@ Base.length(r::FixedSplit) = 1
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
     train = getobs(r.data, r.inds)
-    test = getobs(r.data, setdiff(1:r.nobs, r.inds))
+    test = getobs(r.data, setdiff(OneTo(r.nobs), r.inds))
     return (train, test), state + 1
 end
 
@@ -79,20 +79,20 @@ end
 function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
     n = nobs(data)
     0 < ratio * n < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return RandomSplit(data, n, ceil(Int, ratio * n), shuffle!([1:n;]))
+    return RandomSplit(data, n, ceil(Int, ratio * n), shuffle!([OneTo(n);]))
 end
 
 function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     n = nobs(data)
     0 < m < n || throw(ArgumentError("data cannot be split by $m"))
-    return RandomSplit(data, n, m, shuffle!([1:n;]))
+    return RandomSplit(data, n, m, shuffle!([OneTo(n);]))
 end
 
 Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > 1 && return nothing
-    train = getobs(r.data, r.perm[1:r.m])
+    train = getobs(r.data, r.perm[OneTo(r.m)])
     test = getobs(r.data, r.perm[(r.m + 1):r.nobs])
     return (train, test), state + 1
 end
@@ -123,7 +123,7 @@ Base.length(r::CatagoricalSplit) = length(r.inds)
     state > length(r) && return nothing
     key = first(iterate(keys(r.inds), state))
     train = getobs(r.data, r.inds[key])
-    test = getobs(r.data, setdiff(1:r.nobs, r.inds[key]))
+    test = getobs(r.data, setdiff(OneTo(r.nobs), r.inds[key]))
     return (train, test), state + 1
 end
 
@@ -137,7 +137,7 @@ end
 function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
     n = nobs(data)
     1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
-    return KFold(data, n, k, shuffle!([1:n;]))
+    return KFold(data, n, k, shuffle!([OneTo(n);]))
 end
 
 Base.length(r::KFold) = r.k
@@ -147,7 +147,7 @@ Base.length(r::KFold) = r.k
     m = mod(r.nobs, r.k)
     w = floor(Int, r.nobs / r.k)
     fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
-    train = getobs(r.data, r.perm[1:end .∉ Ref(fold)])
+    train = getobs(r.data, r.perm[setdiff(OneTo(r.nobs), fold)])
     test = getobs(r.data, r.perm[fold])
     return (train, test), state + 1
 end
@@ -175,7 +175,7 @@ end
 
 @propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.data, 1:(r.init + (state - 1) * r.out))
+    train = getobs(r.data, OneTo((r.init + (state - 1) * r.out)))
     test = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, r.nobs))
     return (train, test), state + 1
 end
@@ -285,10 +285,10 @@ function sample(space::AbstractSpace, n::Int = 1)
     m = length(space)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from space"))
     inds = sizehint!(Int[], n)
-    for _ in 1:n
-        i = rand(1:m)
+    for _ in OneTo(n)
+        i = rand(OneTo(m))
         while i in inds
-            i = rand(1:m)
+            i = rand(OneTo(m))
         end
         push!(inds, i)
     end
@@ -353,7 +353,7 @@ function neighbors(space::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
     @inbounds for i in eachindex(dim)
         if i == 1
             d = mod(ref - 1, dim[1]) + 1
-            for j in reverse(1:k)
+            for j in reverse(OneTo(k))
                 if d - j ≥ 1
                     ind = ref - j
                     if ind ∉ bl
@@ -361,7 +361,7 @@ function neighbors(space::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
                     end
                 end
             end
-            for j in 1:k
+            for j in OneTo(k)
                 if d + j ≤ dim[1]
                     ind = ref + j
                     if ind ∉ bl
@@ -371,7 +371,7 @@ function neighbors(space::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
             end
         else
             d = mod((ref - 1) ÷ dim[i - 1], dim[i]) + 1
-            for j in reverse(1:k)
+            for j in reverse(OneTo(k))
                 if d - j ≥ 1
                     ind = ref - j * dim[i - 1]
                     if ind ∉ bl
@@ -379,7 +379,7 @@ function neighbors(space::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
                     end
                 end
             end
-            for j in 1:k
+            for j in OneTo(k)
                 if d + j ≤ dim[i]
                     ind = ref + j * dim[i - 1]
                     if ind ∉ bl
@@ -465,7 +465,7 @@ function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Abs
 
     n = floor(Int, log(1 / rate, length(space)))
     @debug "Start successive halving"
-    for i in 1:n
+    for i in OneTo(n)
         args = getbudget(budget, rate, i, n)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
