@@ -4,7 +4,7 @@ using Base: @propagate_inbounds
 using Random: shuffle!
 using Distributed: @distributed, pmap
 
-export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
+export DataSampler, FixedSplit, RandomSplit, CatagoricalSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
        AbstractSpace, Space, Subspace, sample, neighbors,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha, sasha
 
