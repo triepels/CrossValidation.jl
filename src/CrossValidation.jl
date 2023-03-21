@@ -37,7 +37,7 @@ Base.eltype(r::AbstractResampler) = Tuple{restype(r.data), restype(r.data)}
 struct FixedSplit{D,I} <: AbstractResampler
     data::D
     nobs::Int
-    ind::I
+    inds::I
 end
 
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
@@ -52,20 +52,20 @@ function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     return FixedSplit(data, n, Base.OneTo(m))
 end
 
-function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ind::Any)
+function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, inds::Any)
     n = nobs(data)
-    @boundscheck for i in ind
+    @boundscheck for i in inds
         i ∈ 1:n || throw(BoundsError(data, i))
     end
-    return FixedSplit(data, n, ind)
+    return FixedSplit(data, n, inds)
 end
 
 Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
-    train = getobs(r.data, r.ind)
-    test = getobs(r.data, setdiff(1:r.nobs, r.ind))
+    train = getobs(r.data, r.inds)
+    test = getobs(r.data, setdiff(1:r.nobs, r.inds))
     return (train, test), state + 1
 end
 
