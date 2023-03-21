@@ -34,31 +34,34 @@ abstract type AbstractResampler end
 
 Base.eltype(r::AbstractResampler) = Tuple{restype(r.data), restype(r.data)}
 
-struct FixedSplit{D} <: AbstractResampler
+struct FixedSplit{D,I} <: AbstractResampler
     data::D
     nobs::Int
-    ratio::Number
+    ind::I
 end
 
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
     n = nobs(data)
-    1 ≤ n * ratio ≤ n - 1 || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return FixedSplit(data, n, ratio)
+    0 < n * ratio < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
+    return FixedSplit(data, n, Base.OneTo(ceil(Int, n * ratio)))
 end
 
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
     n = nobs(data)
-    1 ≤ m ≤ n - 1 || throw(ArgumentError("data cannot be split by $m"))
-    return FixedSplit(data, n, m / n)
+    0 < m < n || throw(ArgumentError("data cannot be split by $m"))
+    return FixedSplit(data, n, Base.OneTo(m))
+end
+
+function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ind::Any)
+    return FixedSplit(data, nobs(data), ind)
 end
 
 Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
-    m = ceil(Int, r.ratio * r.nobs)
-    train = getobs(r.data, 1:m)
-    test = getobs(r.data, (m + 1):r.nobs)
+    train = getobs(r.data, r.ind)
+    test = getobs(r.data, setdiff(1:r.nobs, r.ind))
     return (train, test), state + 1
 end
 
