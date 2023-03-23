@@ -122,8 +122,8 @@ Base.length(r::CatagoricalSplit) = length(r.inds)
 @propagate_inbounds function Base.iterate(r::CatagoricalSplit, state = 1)
     state > length(r) && return nothing
     key = first(iterate(keys(r.inds), state))
-    train = getobs(r.data, r.inds[key])
-    test = getobs(r.data, setdiff(OneTo(r.nobs), r.inds[key]))
+    train = getobs(r.data, setdiff(OneTo(r.nobs), r.inds[key]))
+    test = getobs(r.data, r.inds[key])
     return (train, test), state + 1
 end
 
