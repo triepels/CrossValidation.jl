@@ -419,7 +419,7 @@ function hc(T::Type, space::AbstractSpace, data::AbstractResampler, k::Int = 1, 
 
         cand = neighbors(space, cand.inds[i], k, bl)
     end
-    @debug "Finished successive halving"
+    @debug "Finished hill-climbing"
 
     return parm
 end
