@@ -451,7 +451,7 @@ function GeometricBudget(; args...)
 end
 
 function getbudget(b::GeometricBudget{names}, rate::Number, i::Int, n::Int) where names
-    return NamedTuple{names}(map(x -> _cast(typeof(x), rate^(i - 1) * x * (rate - 1) / (rate^n - 1)), b.args))
+    return NamedTuple{names}(map(x -> _cast(typeof(x), x * (rate - 1) * rate^(n - i) / (rate^n - 1)), b.args))
 end
 
 _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
