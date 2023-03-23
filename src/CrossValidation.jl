@@ -401,6 +401,7 @@ function hc(T::Type, space::AbstractSpace, data::AbstractResampler, k::Int = 1, 
 
     cand = sample(space, 1)
 
+    @debug "Start hill-climbing"
     while !isempty(cand)
         append!(bl, cand.inds)
 
@@ -418,6 +419,7 @@ function hc(T::Type, space::AbstractSpace, data::AbstractResampler, k::Int = 1, 
 
         cand = neighbors(space, cand.inds[i], k, bl)
     end
+    @debug "Finished successive halving"
 
     return parm
 end
