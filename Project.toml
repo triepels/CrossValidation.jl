@@ -1,7 +1,7 @@
 name = "CrossValidation"
 uuid = "aa7cfe55-ba28-4f66-bd2e-3f277ea08f09"
 authors = ["Ron Triepels"]
-version = "0.6.1"
+version = "0.6.2"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
