@@ -18,7 +18,7 @@ Function `fit!` takes a model and fits it on data based on some optional fitting
 
 ```julia
 julia> function fit!(model::MyModel, data; args)
-           // Code to fit model...
+           # Code to fit model...
        end
 ```
 
@@ -26,7 +26,7 @@ Function `loss` estimates how well the model performs on (out-of-sample) data:
 
 ```julia
 julia> function loss(model::MyModel, data)
-           // Code to evalute loss of the model...
+           # Code to evalute loss of the model...
        end
 ```
 
