@@ -4,7 +4,7 @@ using Base: @propagate_inbounds, OneTo
 using Random: shuffle!
 using Distributed: @distributed, pmap
 
-export DataSampler, FixedSplit, RandomSplit, CatagoricalSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
+export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
        AbstractSpace, Space, Subspace, sample, neighbors,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha, sasha
 
@@ -94,36 +94,6 @@ Base.length(r::RandomSplit) = 1
     state > 1 && return nothing
     train = getobs(r.data, r.perm[OneTo(r.m)])
     test = getobs(r.data, r.perm[(r.m + 1):r.nobs])
-    return (train, test), state + 1
-end
-
-struct CatagoricalSplit{D,C} <: AbstractResampler
-    data::D
-    nobs::Int
-    inds::Dict{C, Vector{Int}}
-end
-
-function CatagoricalSplit(data::Union{AbstractArray, Tuple, NamedTuple}, categories::T) where T <: AbstractArray
-    n = nobs(data)
-    length(categories) == n || throw(ArgumentError("number of observations and categories do not match"))
-    inds = Dict{eltype(categories), Vector{Int}}()
-    for (i, x) in enumerate(categories)
-        if !haskey(inds, x)
-            push!(inds, x => [i])
-        else
-            push!(inds[x], i)
-        end
-    end
-    return CatagoricalSplit(data, n, inds)
-end
-
-Base.length(r::CatagoricalSplit) = length(r.inds)
-
-@propagate_inbounds function Base.iterate(r::CatagoricalSplit, state = 1)
-    state > length(r) && return nothing
-    key = first(iterate(keys(r.inds), state))
-    train = getobs(r.data, setdiff(OneTo(r.nobs), r.inds[key]))
-    test = getobs(r.data, r.inds[key])
     return (train, test), state + 1
 end
 

@@ -54,7 +54,6 @@ julia> validate(KFold(data)) do train
 The following resample methods are available:
 * Fixed Split
 * Random Split (holdout)
-* Catagorical Split
 * K-fold
 * Forward Chaining
 * Sliding Window
