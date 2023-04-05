@@ -4,7 +4,7 @@ using Base: @propagate_inbounds, OneTo
 using Random: shuffle!
 using Distributed: @distributed, pmap
 
-export DataSampler, FixedSplit, RandomSplit, KFold, ForwardChaining, SlidingWindow, PreProcess,
+export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow, PreProcess,
        AbstractSpace, Space, Subspace, sample, neighbors,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha, sasha
 
@@ -94,6 +94,24 @@ Base.length(r::RandomSplit) = 1
     state > 1 && return nothing
     train = getobs(r.data, r.perm[OneTo(r.m)])
     test = getobs(r.data, r.perm[(r.m + 1):r.nobs])
+    return (train, test), state + 1
+end
+
+struct LeaveOneOut{D} <: AbstractResampler
+    data::D
+    nobs::Int
+end
+
+function LeaveOneOut(data::Union{AbstractArray, Tuple, NamedTuple})
+    return LeaveOneOut(data, nobs(data))
+end
+
+Base.length(r::LeaveOneOut) = r.nobs
+
+@propagate_inbounds function Base.iterate(r::LeaveOneOut, state = 1)
+    state > length(r) && return nothing
+    train = getobs(r.data, union(OneTo(state - 1), (state + 1):r.nobs))
+    test = getobs(r.data, state:state)
     return (train, test), state + 1
 end
 

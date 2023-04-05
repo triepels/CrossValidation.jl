@@ -20,13 +20,18 @@ function loss(model::MyModel, x::AbstractArray)
     return (a^2 + b - 11)^2 + (a + b^2 - 7)^2
 end
 
+x = permutedims(1:100)
+
+collect(FixedSplit(x))
+collect(RandomSplit(x))
+collect(LeaveOneOut(x))
+collect(KFold(x))
+collect(ForwardChaining(x, 40, 10))
+collect(SlidingWindow(x, 40, 10))
+
 x = rand(2, 100)
 
 validate(MyModel(2.0, 2.0), FixedSplit(x), epochs = 100)
-validate(MyModel(2.0, 2.0), RandomSplit(x), epochs = 100)
-validate(MyModel(2.0, 2.0), KFold(x), epochs = 100)
-validate(MyModel(2.0, 2.0), ForwardChaining(x, 40, 10), epochs = 100)
-validate(MyModel(2.0, 2.0), SlidingWindow(x, 40, 10), epochs = 100)
 
 space = Space(a = -6.0:0.5:6.0, b = -6.0:0.5:6.0)
 
