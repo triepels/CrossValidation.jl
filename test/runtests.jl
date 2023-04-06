@@ -20,14 +20,12 @@ function loss(model::MyModel, x::AbstractArray)
     return (a^2 + b - 11)^2 + (a + b^2 - 7)^2
 end
 
-x = permutedims(1:100)
-
-collect(FixedSplit(x))
-collect(RandomSplit(x))
-collect(LeaveOneOut(x))
-collect(KFold(x))
-collect(ForwardChaining(x, 40, 10))
-collect(SlidingWindow(x, 40, 10))
+collect(FixedSplit(1:100))
+collect(RandomSplit(1:100))
+collect(LeaveOneOut(1:100))
+collect(KFold(1:100))
+collect(ForwardChaining(1:100, 40, 10))
+collect(SlidingWindow(1:100, 40, 10))
 
 x = rand(2, 100)
 
