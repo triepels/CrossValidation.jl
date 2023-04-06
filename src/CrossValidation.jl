@@ -190,21 +190,6 @@ end
     return (train, test), state + 1
 end
 
-struct PreProcess <: AbstractResampler
-    res::AbstractResampler
-    f::Function
-end
-
-Base.eltype(p::PreProcess) = eltype(p.res)
-Base.length(p::PreProcess) = length(p.res)
-
-function Base.iterate(r::PreProcess, state = 1)
-    next = iterate(r.res, state)
-    next === nothing && return nothing
-    (train, test), state = next
-    return r.f(train, test), state
-end
-
 abstract type AbstractSpace end
 
 Base.keys(s::AbstractSpace) = OneTo(length(s))
