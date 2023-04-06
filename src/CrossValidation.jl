@@ -56,7 +56,7 @@ Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
-    train = getobs(r.data, 1:r.m)
+    train = getobs(r.data, OneTo(r.m))
     test = getobs(r.data, (r.m + 1):r.nobs)
     return (train, test), state + 1
 end
