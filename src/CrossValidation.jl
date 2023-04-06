@@ -103,7 +103,9 @@ struct LeaveOneOut{D} <: AbstractResampler
 end
 
 function LeaveOneOut(data::Union{AbstractArray, Tuple, NamedTuple})
-    return LeaveOneOut(data, nobs(data))
+    n = nobs(data)
+    n > 1 || throw(ArgumentError("data has too few observations to split"))
+    return LeaveOneOut(data, n)
 end
 
 Base.length(r::LeaveOneOut) = r.nobs
