@@ -48,7 +48,7 @@ validate(KFold(x)) do train
 end
 
 validate(KFold(x)) do train
-    prms = hc(MyModel, space, FixedSplit(train), 1, false, epochs = 100)
+    prms = hc(MyModel, space, FixedSplit(train), 1, 1, false, epochs = 100)
     return fit!(MyModel(prms...), train)
 end
 
