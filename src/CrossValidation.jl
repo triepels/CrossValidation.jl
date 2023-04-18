@@ -6,7 +6,7 @@ using Distributed: @distributed, pmap
 
 import Random: rand
 
-export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow, PreProcess,
+export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, DiscreteSpace, ContinousSpace, MixedSpace, sample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha, sasha
 
