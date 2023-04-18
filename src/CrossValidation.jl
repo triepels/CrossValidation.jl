@@ -1,7 +1,7 @@
 module CrossValidation
 
 using Base: @propagate_inbounds, OneTo
-using Random: AbstractRNG, shuffle!
+using Random: GLOBAL_RNG, AbstractRNG, shuffle!
 using Distributed: @distributed, pmap
 
 import Random: rand
@@ -196,10 +196,11 @@ end
 
 abstract type AbstractSpace{names} end
 
-rand(rng::AbstractRNG, s::AbstractSpace{names}) where names = NamedTuple{names}(map(rand, vars(s)))
+sample(rng::AbstractRNG, space::AbstractSpace{names}) where names = NamedTuple{names}(map(x -> rand(rng, x), vars(space)))
+sample(space::AbstractSpace{names}) where names = sample(GLOBAL_RNG, space)
 
-sample(space::AbstractSpace) = rand(space)
-sample(space::AbstractSpace, n::Int) = [rand(space) for _ in OneTo(n)]
+sample(rng::AbstractRNG, space::AbstractSpace, n::Int) = [sample(rng, space) for _ in OneTo(n)]
+sample(space::AbstractSpace, n::Int) = sample(GLOBAL_RNG, space, n)
 
 struct DiscreteSpace{names, T<:Tuple} <: AbstractSpace{names}
     vars::T
@@ -239,7 +240,7 @@ end
     return s[state], state + 1
 end
 
-function sample(space::DiscreteSpace, n::Int)
+function sample(rng::AbstractRNG, space::DiscreteSpace, n::Int)
     m = length(space)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
     inds = sizehint!(Int[], n)
@@ -252,6 +253,8 @@ function sample(space::DiscreteSpace, n::Int)
     end
     return [space[i] for i in inds]
 end
+
+sample(space::DiscreteSpace, n::Int) = sample(GLOBAL_RNG, space, n)
 
 abstract type AbstractDistribution end
 
