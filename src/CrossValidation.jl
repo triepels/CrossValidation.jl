@@ -7,9 +7,8 @@ using Distributed: @distributed, pmap
 import Random: rand
 
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
-       AbstractSpace, DiscreteSpace, ContinousSpace, MixedSpace,
+       AbstractSpace, DiscreteSpace, ContinousSpace, MixedSpace, ParameterVector,
        AbstractDistribution, Uniform, Normal, sample,
-       DiscreteSpaceOrSample, ContinousSpaceOrSample, MixedSpaceOrSample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha, sasha
 
 nobs(x::Any) = 1
@@ -292,9 +291,7 @@ end
 
 vars(s::MixedSpace) = s.vars
 
-const DiscreteSpaceOrSample = Union{Array{NamedTuple{names, T}, N}, DiscreteSpace} where {names, T, N}
-const ContinousSpaceOrSample = Union{Array{NamedTuple{names, T}, N}, ContinousSpace} where {names, T, N}
-const MixedSpaceOrSample = Union{Array{NamedTuple{names, T}, N}, MixedSpace} where {names, T, N}
+const ParameterVector = Array{NamedTuple{names, T}, 1} where {names, T}
 
 _fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
 _fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
@@ -306,14 +303,14 @@ _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
 loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(model))"))
 
-@inline function _val(T, space, data, args)
-    return sum(x -> _val_split(T, space, x..., args), data) / length(data)
+@inline function _val(T, prms, data, args)
+    return sum(x -> _val_split(T, prms, x..., args), data) / length(data)
 end
 
-function _val_split(T, space, train, test, args)
-    models = pmap(x -> _fit!(T(; x...), train, args), space)
+function _val_split(T, prms, train, test, args)
+    models = pmap(x -> _fit!(T(; x...), train, args), prms)
     loss = map(x -> _loss(x, test), models)
-    @debug "Validated models" prms=collect(space) args loss
+    @debug "Validated models" prms args loss
     return loss
 end
 
@@ -334,14 +331,17 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, maximize::Bool = true; args...)
-    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function brute(T::Type, prms::ParameterVector, data::AbstractResampler, maximize::Bool = true; args...)
+    length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
-    loss = _val(T, space, data, args)
+    loss = _val(T, prms, data, args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
-    return space[ind]
+    return prms[ind]
 end
+
+brute(T::Type, space::DiscreteSpace, data::AbstractResampler, maximize::Bool = true; args...) =
+    brute(T, collect(space), data, maximize; args...)
 
 function _neighbors(space::DiscreteSpace, ref::Int, k::Int, bl::Vector{Int} = Int[])
     if k > length(space)
@@ -456,16 +456,15 @@ end
 
 _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
 
-function sha(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true)
-    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true)
+    length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
     0 < rate < 1 || throw(ArgumentError("unable to halve arms with rate $rate"))
 
     train, test = first(data)
-    arms = map(x -> T(; x...), space)
-    prms = collect(space)
+    arms = map(x -> T(; x...), prms)
 
-    n = floor(Int, log(1 / rate, length(space)))
+    n = floor(Int, log(1 / rate, length(prms)))
     @debug "Start successive halving"
     for i in OneTo(n)
         args = getbudget(budget, rate, i, n)
@@ -482,14 +481,16 @@ function sha(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, bud
     return first(prms)
 end
 
-function sasha(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
-    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+sha(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true) =
+    sha(T, collect(space), data, budget, rate, maximize)
+
+function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
+    length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
     0 ≤ temp  || throw(ArgumentError("initial temperature must be positive"))
 
     train, test = first(data)
-    arms = map(x -> T(; x...), space)
-    prms = collect(space)
+    arms = map(x -> T(; x...), prms)
 
     i = 1
     while length(arms) > 1
@@ -515,5 +516,8 @@ function sasha(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, t
 
     return first(prms), budget
 end
+
+sasha(T::Type, space::DiscreteSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...) =
+    sasha(T, collect(space), data, temp, maximize; args...)
 
 end
