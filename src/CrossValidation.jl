@@ -239,20 +239,23 @@ end
     return s[state], state + 1
 end
 
-function sample(rng::AbstractRNG, space::DiscreteSpace, n::Int)
-    m = length(space)
+function _sample(rng, iter, n)
+    m = length(iter)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
-    inds = sizehint!(Int[], n)
+    vals = sizehint!(eltype(iter)[], n)
     for _ in OneTo(n)
-        i = rand(OneTo(m))
-        while i in inds
-            i = rand(OneTo(m))
+        val = rand(rng, iter)
+        while val in vals
+            val = rand(rng, iter)
         end
-        push!(inds, i)
+        push!(vals, val)
     end
-    return [space[i] for i in inds]
+    return vals
 end
 
+_sample(iter, n) = _sample(GLOBAL_RNG, iter, n)
+
+sample(rng::AbstractRNG, space::DiscreteSpace, n::Int) = [space[i] for i in _sample(OneTo(length(space)), n)]
 sample(space::DiscreteSpace, n::Int) = sample(GLOBAL_RNG, space, n)
 
 abstract type AbstractDistribution end
