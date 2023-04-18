@@ -292,9 +292,9 @@ end
 
 vars(s::MixedSpace) = s.vars
 
-const DiscreteSpaceOrSample = Union{Array{NamedTuple{names, T}, 1}, DiscreteSpace} where {names, T}
-const ContinousSpaceOrSample = Union{Array{NamedTuple{names, T}, 1}, ContinousSpace} where {names, T}
-const MixedSpaceOrSample = Union{Array{NamedTuple{names, T}, 1}, MixedSpace} where {names, T}
+const DiscreteSpaceOrSample = Union{Array{NamedTuple{names, T}, N}, DiscreteSpace} where {names, T, N}
+const ContinousSpaceOrSample = Union{Array{NamedTuple{names, T}, N}, ContinousSpace} where {names, T, N}
+const MixedSpaceOrSample = Union{Array{NamedTuple{names, T}, N}, MixedSpace} where {names, T, N}
 
 _fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
 _fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
