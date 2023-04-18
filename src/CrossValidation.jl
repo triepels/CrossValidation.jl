@@ -511,7 +511,9 @@ function sasha(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, t
         i += 1
     end
 
-    return first(prms)
+    budget = map(x -> i * x, values(args))
+
+    return first(prms), budget
 end
 
 end
