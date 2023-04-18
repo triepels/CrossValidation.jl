@@ -386,7 +386,7 @@ function _neighbors(space::DiscreteSpace, ref::Int, k::Int, bl::Vector{Int} = In
     return inds
 end
 
-function hc(T::Type, space::DiscreteSpace, data::AbstractResampler, k::Int = 1, maximize::Bool = true; args...)
+function hc(T::Type, space::DiscreteSpace, data::AbstractResampler, nstart::Int = 1, k::Int = 1, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
 
@@ -394,7 +394,7 @@ function hc(T::Type, space::DiscreteSpace, data::AbstractResampler, k::Int = 1, 
     parm = nothing
     best = maximize ? -Inf : Inf
 
-    cand = rand(OneTo(length(space)), 1)
+    cand = rand(OneTo(length(space)), nstart)
 
     @debug "Start hill-climbing"
     while !isempty(cand)
