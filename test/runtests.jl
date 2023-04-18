@@ -43,21 +43,21 @@ sha(MyModel, sample(space, 100), FixedSplit(x), GeometricBudget(epochs = 100), 0
 sasha(MyModel, space, FixedSplit(x), 1, false, epochs = 1)
 
 validate(KFold(x)) do train
-    parms = brute(MyModel, space, FixedSplit(train), false, epochs = 100)
-    return fit!(MyModel(parms...), train)
+    prms = brute(MyModel, space, FixedSplit(train), false, epochs = 100)
+    return fit!(MyModel(prms...), train)
 end
 
 validate(KFold(x)) do train
-    parms = hc(MyModel, space, FixedSplit(train), 1, false, epochs = 100)
-    return fit!(MyModel(parms...), train)
+    prms = hc(MyModel, space, FixedSplit(train), 1, false, epochs = 100)
+    return fit!(MyModel(prms...), train)
 end
 
 validate(KFold(x)) do train
-    parms = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs = 100), 0.5, false)
-    return fit!(MyModel(parms...), train)
+    prms = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs = 100), 0.5, false)
+    return fit!(MyModel(prms...), train)
 end
 
 validate(KFold(x)) do train
-    parms = sasha(MyModel, space, FixedSplit(train), 1, false, epochs = 1)
-    return fit!(MyModel(parms...), train)
+    prms, args = sasha(MyModel, space, FixedSplit(train), 1, false, epochs = 1)
+    return fit!(MyModel(prms...), train; args...)
 end
