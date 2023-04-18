@@ -1,11 +1,13 @@
 module CrossValidation
 
 using Base: @propagate_inbounds, OneTo
-using Random: shuffle!
+using Random: AbstractRNG, shuffle!
 using Distributed: @distributed, pmap
 
+import Random: rand
+
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow, PreProcess,
-       AbstractSpace, Space, Subspace, sample, neighbors,
+       AbstractSpace, DiscreteSpace, ContinousSpace, MixedSpace, sample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha, sasha
 
 nobs(x::Any) = 1
@@ -190,67 +192,54 @@ end
     return (train, test), state + 1
 end
 
-abstract type AbstractSpace end
+abstract type AbstractSpace{names} end
 
-Base.keys(s::AbstractSpace) = OneTo(length(s))
+rand(rng::AbstractRNG, s::AbstractSpace{names}) where names = NamedTuple{names}(map(rand, vars(s)))
 
-@propagate_inbounds function Base.iterate(s::AbstractSpace, state = 1)
+sample(space::AbstractSpace) = rand(space)
+sample(space::AbstractSpace, n::Int) = [rand(space) for _ in OneTo(n)]
+
+struct DiscreteSpace{names, T<:Tuple} <: AbstractSpace{names}
+    vars::T
+end
+
+function DiscreteSpace(; vars...)
+    return DiscreteSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
+end
+
+vars(s::DiscreteSpace) = s.vars
+
+Base.eltype(::Type{DiscreteSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
+Base.length(s::DiscreteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
+
+Base.firstindex(s::DiscreteSpace) = 1
+Base.lastindex(s::DiscreteSpace) = length(s)
+
+Base.size(s::DiscreteSpace) = length(s.vars) == 0 ? (0,) : map(length, s.vars)
+
+@inline function Base.getindex(s::DiscreteSpace{names, T}, i::Int) where {names, T}
+    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
+    strides = (1, cumprod(map(length, Base.front(s.vars)))...)
+    return NamedTuple{names}(map(getindex, s.vars, mod.((i - 1) .÷ strides, size(s)) .+ 1))
+end
+
+@inline function Base.getindex(s::DiscreteSpace{names, T}, I::Vararg{Int, N}) where {names, T, N}
+    @boundscheck length(I) == length(s.vars) && all(1 .≤ I .≤ size(s)) || throw(BoundsError(s, I))
+    return NamedTuple{names}(map(getindex, s.vars, I))
+end
+
+@inline function Base.getindex(s::DiscreteSpace{names, T}, inds::Vector{Int}) where {names, T}
+    return [s[i] for i in inds]
+end
+
+@propagate_inbounds function Base.iterate(s::DiscreteSpace, state = 1)
     state > length(s) && return nothing
     return s[state], state + 1
 end
 
-struct Space{names, T<:Tuple} <: AbstractSpace
-    iters::T
-end
-
-function Space(; iters...)
-    return Space{keys(iters), typeof(values(values(iters)))}(values(values(iters)))
-end
-
-Base.eltype(::Type{Space{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
-Base.length(s::Space) = length(s.iters) == 0 ? 0 : prod(length, s.iters)
-
-Base.firstindex(s::Space) = 1
-Base.lastindex(s::Space) = length(s)
-
-Base.size(s::Space) = length(s.iters) == 0 ? (0,) : map(length, s.iters)
-
-function Base.size(s::Space, d::Integer)
-    @boundscheck d < 1 && throw(DimensionMismatch("dimension out of range"))
-    return d > length(s.iters) ? 1 : length(s.iters[d])
-end
-
-@inline function Base.getindex(s::Space{names, T}, i::Int) where {names, T}
-    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
-    strides = (1, cumprod(map(length, Base.front(s.iters)))...)
-    return NamedTuple{names}(map(getindex, s.iters, mod.((i - 1) .÷ strides, size(s)) .+ 1))
-end
-
-@inline function Base.getindex(s::Space{names, T}, I::Vararg{Int, N}) where {names, T, N}
-    @boundscheck length(I) == length(s.iters) && all(1 .≤ I .≤ size(s)) || throw(BoundsError(s, I))
-    return NamedTuple{names}(map(getindex, s.iters, I))
-end
-
-@inline function Base.getindex(s::Space{names, T}, inds::Vector{Int}) where {names, T}
-    return [s[i] for i in inds]
-end
-
-struct Subspace <: AbstractSpace
-    space::AbstractSpace
-    inds::Vector{Int}
-end
-
-Base.eltype(s::Subspace) = eltype(s.space)
-Base.length(s::Subspace) = length(s.inds)
-
-@inline function Base.getindex(s::Subspace, i::Int)
-    @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
-    return @inbounds s.space[s.inds[i]]
-end
-
-function sample(space::AbstractSpace, n::Int = 1)
+function sample(space::DiscreteSpace, n::Int)
     m = length(space)
-    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from space"))
+    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
     inds = sizehint!(Int[], n)
     for _ in OneTo(n)
         i = rand(OneTo(m))
@@ -259,8 +248,48 @@ function sample(space::AbstractSpace, n::Int = 1)
         end
         push!(inds, i)
     end
-    return Subspace(space, inds)
+    return [space[i] for i in inds]
 end
+
+abstract type AbstractDistribution end
+
+struct Uniform{T<:Number} <: AbstractDistribution
+    a::T
+    b::T
+end
+
+rand(rng::AbstractRNG, d::Uniform{T}) where T = d.a + (d.b - d.a) * rand(rng, float(T))
+
+struct Normal{T<:Number} <: AbstractDistribution
+    mean::T
+    std::T
+end
+
+rand(rng::AbstractRNG, d::Normal{T}) where T = d.mean + d.std * randn(rng, float(T))
+
+struct ContinousSpace{names, T<:Tuple{Vararg{AbstractDistribution}}} <: AbstractSpace{names}
+    vars::T
+end
+
+function ContinousSpace(; vars...)
+    return ContinousSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
+end
+
+vars(s::ContinousSpace) = s.vars
+
+struct MixedSpace{names, T<:Tuple} <: AbstractSpace{names}
+    vars::T
+end
+
+function MixedSpace(; vars...)
+    return MixedSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
+end
+
+vars(s::MixedSpace) = s.vars
+
+const DiscreteSpaceOrSample = Union{Array{NamedTuple{names, T}, 1}, DiscreteSpace} where {names, T}
+const ContinousSpaceOrSample = Union{Array{NamedTuple{names, T}, 1}, ContinousSpace} where {names, T}
+const MixedSpaceOrSample = Union{Array{NamedTuple{names, T}, 1}, MixedSpace} where {names, T}
 
 _fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
 _fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
@@ -300,7 +329,7 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(T::Type, space::AbstractSpace, data::AbstractResampler, maximize::Bool = true; args...)
+function brute(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
     loss = _val(T, space, data, args)
@@ -309,9 +338,7 @@ function brute(T::Type, space::AbstractSpace, data::AbstractResampler, maximize:
     return space[ind]
 end
 
-function neighbors(space::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
-    @boundscheck 1 ≤ ref ≤ length(space) || throw(BoundsError(space, ref))
-    k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
+function _neighbors(space::DiscreteSpace, ref::Int, k::Int, bl::Vector{Int} = Int[])
     if k > length(space)
         return Subspace(space, setdiff(keys(space), rand(keys(space))))
     end
@@ -356,23 +383,24 @@ function neighbors(space::Space, ref::Int, k::Int, bl::Vector{Int} = Int[])
             end
         end
     end
-    return Subspace(space, inds)
+    return inds
 end
 
-function hc(T::Type, space::AbstractSpace, data::AbstractResampler, k::Int = 1, maximize::Bool = true; args...)
+function hc(T::Type, space::DiscreteSpace, data::AbstractResampler, k::Int = 1, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
 
     bl = Int[]
     parm = nothing
     best = maximize ? -Inf : Inf
 
-    cand = sample(space, 1)
+    cand = rand(OneTo(length(space)), 1)
 
     @debug "Start hill-climbing"
     while !isempty(cand)
-        append!(bl, cand.inds)
+        append!(bl, cand)
 
-        loss = _val(T, cand, data, args)
+        loss = _val(T, space[cand], data, args)
         if maximize
             i = argmax(loss)
             loss[i] > best || break
@@ -381,10 +409,10 @@ function hc(T::Type, space::AbstractSpace, data::AbstractResampler, k::Int = 1, 
             loss[i] < best || break
         end
 
-        parm = cand[i]
+        parm = space[cand[i]]
         best = loss[i]
 
-        cand = neighbors(space, cand.inds[i], k, bl)
+        cand = _neighbors(space, cand[i], k, bl)
     end
     @debug "Finished hill-climbing"
 
@@ -423,7 +451,7 @@ end
 
 _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
 
-function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true)
+function sha(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
     0 < rate < 1 || throw(ArgumentError("unable to halve arms with rate $rate"))
@@ -449,7 +477,7 @@ function sha(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Abs
     return first(prms)
 end
 
-function sasha(T::Type, space::AbstractSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
+function sasha(T::Type, space::DiscreteSpaceOrSample, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
     0 ≤ temp  || throw(ArgumentError("initial temperature must be positive"))

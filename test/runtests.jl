@@ -20,18 +20,18 @@ function loss(model::MyModel, x::AbstractArray)
     return (a^2 + b - 11)^2 + (a + b^2 - 7)^2
 end
 
-collect(FixedSplit(1:100))
-collect(RandomSplit(1:100))
-collect(LeaveOneOut(1:100))
-collect(KFold(1:100))
-collect(ForwardChaining(1:100, 40, 10))
-collect(SlidingWindow(1:100, 40, 10))
+collect(FixedSplit(1:10))
+collect(RandomSplit(1:10))
+collect(LeaveOneOut(1:10))
+collect(KFold(1:10))
+collect(ForwardChaining(1:10, 4, 2))
+collect(SlidingWindow(1:10, 4, 2))
 
 x = rand(2, 100)
 
 validate(MyModel(2.0, 2.0), FixedSplit(x), epochs = 100)
 
-space = Space(a = -6.0:0.5:6.0, b = -6.0:0.5:6.0)
+space = DiscreteSpace(a = -6.0:0.5:6.0, b = -6.0:0.5:6.0)
 
 brute(MyModel, space, FixedSplit(x), false, epochs = 100)
 brute(MyModel, sample(space, 100), FixedSplit(x), false, epochs = 100)
