@@ -461,7 +461,7 @@ _halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
 
 function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
+    length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     0 < rate < 1 || throw(ArgumentError("unable to halve arms with rate $rate"))
 
     train, test = first(data)
@@ -489,7 +489,7 @@ sha(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudg
 
 function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
+    length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
     train, test = first(data)
