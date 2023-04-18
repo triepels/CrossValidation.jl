@@ -346,7 +346,7 @@ end
 brute(T::Type, space::DiscreteSpace, data::AbstractResampler, maximize::Bool = true; args...) =
     brute(T, collect(space), data, maximize; args...)
 
-function _neighbors(space::DiscreteSpace, ref::Int, k::Int, bl::Vector{Int} = Int[])
+function _neighbors(space, ref, k, bl)
     if k > length(space)
         return Subspace(space, setdiff(keys(space), rand(keys(space))))
     end
