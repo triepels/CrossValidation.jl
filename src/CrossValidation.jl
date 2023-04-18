@@ -400,7 +400,7 @@ function hc(T::Type, space::DiscreteSpace, data::AbstractResampler, nstart::Int 
     while !isempty(cand)
         append!(bl, cand)
 
-        loss = _val(T, space[cand], data, args)
+        loss = _val(T, space[cand], data, values(args))
         if maximize
             i = argmax(loss)
             loss[i] > best || break
