@@ -7,7 +7,9 @@ using Distributed: @distributed, pmap
 import Random: rand
 
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
-       AbstractSpace, DiscreteSpace, ContinousSpace, MixedSpace, sample,
+       AbstractSpace, DiscreteSpace, ContinousSpace, MixedSpace,
+       AbstractDistribution, Uniform, Normal, sample,
+       DiscreteSpaceOrSample, ContinousSpaceOrSample, MixedSpaceOrSample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, sha, sasha
 
 nobs(x::Any) = 1
