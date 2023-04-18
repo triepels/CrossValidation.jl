@@ -495,15 +495,15 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
     train, test = first(data)
     arms = map(x -> T(; x...), prms)
 
-    i = 1
+    n = 1
     while length(arms) > 1
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         
         if maximize
-            prob = exp.(i .* (loss .- max(loss...)) ./ temp)
+            prob = exp.(n .* (loss .- max(loss...)) ./ temp)
         else
-            prob = exp.(-i .* (loss .- min(loss...)) ./ temp)
+            prob = exp.(-n .* (loss .- min(loss...)) ./ temp)
         end
 
         @debug "Validated arms" prms prob loss
@@ -512,10 +512,10 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
         arms = arms[inds]
         prms = prms[inds]
 
-        i += 1
+        n += 1
     end
 
-    budget = map(x -> i * x, values(args))
+    budget = map(x -> n * x, values(args))
 
     return first(prms), budget
 end
