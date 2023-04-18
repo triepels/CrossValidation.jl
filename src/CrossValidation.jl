@@ -490,7 +490,7 @@ sha(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudg
 function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("cannot optimize over more than one resample fold"))
-    0 ≤ temp  || throw(ArgumentError("initial temperature must be positive"))
+    temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
     train, test = first(data)
     arms = map(x -> T(; x...), prms)
