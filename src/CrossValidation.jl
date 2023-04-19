@@ -427,68 +427,95 @@ function hc(T::Type, space::DiscreteSpace, data::AbstractResampler, nstart::Int 
     return parm
 end
 
-abstract type AbstractBudget end
+abstract type AbstractScheduler{names, T} end
+
+Base.eltype(b::AbstractScheduler{names, T}) where {names, T} = NamedTuple{names, T}
+Base.length(b::AbstractScheduler) = narms(b) == 0 ? 0 : floor(Int, log(1 / rate(b), narms(b))) + 1
 
 _cast(T::Type{A}, x::Integer) where A <: AbstractFloat = T(x)
 _cast(T::Type{A}, x::AbstractFloat) where A <: Integer = floor(T, x)
 _cast(T::Type{A}, x::Number) where A <: Number = x
 
-struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
-    args::T
+mutable struct GeometricBudget{names, T1<:Tuple{Vararg{Number}}, T2<:AbstractFloat} <: AbstractScheduler{names, T1}
+    args::T1
+    rate::T2
+    narms::Int
 end
 
-function ConstantBudget(; args...)
-    return ConstantBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
+function GeometricBudget(rate; args...)
+    return GeometricBudget{keys(args), typeof(values(values(args))), typeof(rate)}(values(values(args)), rate, 0)
 end
 
-function getbudget(b::ConstantBudget{names}, rate::Number, m::Int, k::Int) where names
-    n = floor(Int, log(1 / rate, m)) + 1
-    return NamedTuple{names}(map(x -> _cast(typeof(x), x * (1 - rate) / (m * (1 - rate^n))), b.args))
+@propagate_inbounds function Base.iterate(b::GeometricBudget{names}, state = 1) where names
+    n = length(b)
+    state > n && return nothing
+    k = ceil(Int, b.narms * b.rate^(state - 1))
+    prms = NamedTuple{names}(map(x -> _cast(typeof(x), x / (k * n)), b.args))
+    return prms, state + 1
 end
 
-struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
-    args::T
+rate(b::GeometricBudget) = b.rate
+narms(b::GeometricBudget) = b.narms
+
+function narms!(b::GeometricBudget, n::Int)
+    b.narms = n
+    return b
 end
 
-function GeometricBudget(; args...)
-    return GeometricBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
+mutable struct ConstantBudget{names, T1<:Tuple{Vararg{Number}}, T2<:AbstractFloat} <: AbstractScheduler{names, T1}
+    args::T1
+    rate::T2
+    narms::Int
 end
 
-function getbudget(b::GeometricBudget{names}, rate::Number, m::Int, k::Int) where names
-    n = floor(Int, log(1 / rate, m)) + 1
-    return NamedTuple{names}(map(x -> _cast(typeof(x), x / (k * n)), b.args))
+function ConstantBudget(rate; args...)
+    return ConstantBudget{keys(args), typeof(values(values(args))), typeof(rate)}(values(values(args)), rate, 0)
+end
+
+@propagate_inbounds function Base.iterate(b::ConstantBudget{names}, state = 1) where names
+    n = length(b)
+    state > n && return nothing
+    c = (1 - b.rate) / (b.narms * (1 - b.rate^n))
+    prms = NamedTuple{names}(map(x -> _cast(typeof(x), x * c), b.args))
+    return prms, state + 1
+end
+
+rate(b::ConstantBudget) = b.rate
+narms(b::ConstantBudget) = b.narms
+
+function narms!(b::ConstantBudget, n::Int)
+    b.narms = n
+    return b
 end
 
 _discard!(x, rate) = resize!(x, round(Int, rate * length(x), RoundNearestTiesUp))
 
-function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true)
+function sha(T::Type, prms::ParameterVector, data::AbstractResampler, scheduler::AbstractScheduler, maximize::Bool = true)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
-    0 < rate < 1 || throw(ArgumentError("unable to halve arms with rate $rate"))
 
     train, test = first(data)
     arms = map(x -> T(; x...), prms)
 
-    m = length(arms)
-    n = floor(Int, log(1 / rate, m)) + 1
+    narms!(scheduler, length(arms))
+
     @debug "Start successive halving"
-    for _ in OneTo(n)
-        args = getbudget(budget, rate, m, length(arms))
+    for args in scheduler
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" prms args loss
-        
+
         inds = sortperm(loss, rev=maximize)
-        arms = _discard!(arms[inds], rate)
-        prms = _discard!(prms[inds], rate)
+        arms = _discard!(arms[inds], rate(scheduler))
+        prms = _discard!(prms[inds], rate(scheduler))
     end
     @debug "Finished successive halving"
 
     return first(prms)
 end
 
-sha(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true) =
-    sha(T, collect(space), data, budget, rate, maximize)
+sha(T::Type, space::DiscreteSpace, data::AbstractResampler, scheduler::AbstractScheduler, maximize::Bool = true) =
+    sha(T, collect(space), data, scheduler, maximize)
 
 function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
