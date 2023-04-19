@@ -37,8 +37,8 @@ brute(MyModel, space, FixedSplit(x), false, epochs = 100)
 brute(MyModel, sample(space, 100), FixedSplit(x), false, epochs = 100)
 hc(MyModel, space, FixedSplit(x), 1, 1, false, epochs = 100)
 
-sha(MyModel, space, FixedSplit(x), ConstantBudget(0.5, epochs = 100), false)
-sha(MyModel, sample(space, 100), FixedSplit(x), GeometricBudget(0.5, epochs = 100), false)
+sha(MyModel, space, FixedSplit(x), ConstantBudget(epochs = 100), 0.5, false)
+sha(MyModel, sample(space, 100), FixedSplit(x), GeometricBudget(epochs = 100), 0.5, false)
 
 sasha(MyModel, space, FixedSplit(x), 1, false, epochs = 1)
 
@@ -53,7 +53,7 @@ validate(KFold(x)) do train
 end
 
 validate(KFold(x)) do train
-    prms = sha(MyModel, space, FixedSplit(train), ConstantBudget(0.5, epochs = 100), false)
+    prms = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs = 100), 0.5, false)
     return fit!(MyModel(prms...), train)
 end
 
