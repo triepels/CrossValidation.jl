@@ -441,8 +441,9 @@ function ConstantBudget(; args...)
     return ConstantBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-function getbudget(b::ConstantBudget{names}, rate::Number, i::Int, n::Int) where names
-    return NamedTuple{names}(map(x -> _cast(typeof(x), x / n), b.args))
+function getbudget(b::ConstantBudget{names}, rate::Number, m::Int, k::Int) where names
+    n = floor(Int, log(1 / rate, m)) + 1
+    return NamedTuple{names}(map(x -> _cast(typeof(x), x * (1 - rate) / (m * (1 - rate^n))), b.args))
 end
 
 struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
@@ -453,11 +454,12 @@ function GeometricBudget(; args...)
     return GeometricBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-function getbudget(b::GeometricBudget{names}, rate::Number, i::Int, n::Int) where names
-    return NamedTuple{names}(map(x -> _cast(typeof(x), x * (rate - 1) * rate^(n - i) / (rate^n - 1)), b.args))
+function getbudget(b::GeometricBudget{names}, rate::Number, m::Int, k::Int) where names
+    n = floor(Int, log(1 / rate, m)) + 1
+    return NamedTuple{names}(map(x -> _cast(typeof(x), x / (k * n)), b.args))
 end
 
-_halve!(x::Vector) = resize!(x, ceil(Int, length(x) / 2))
+_discard!(x, rate) = resize!(x, round(Int, rate * length(x), RoundNearestTiesUp))
 
 function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number = 0.5, maximize::Bool = true)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
@@ -467,17 +469,18 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     train, test = first(data)
     arms = map(x -> T(; x...), prms)
 
-    n = floor(Int, log(1 / rate, length(prms)))
+    m = length(prms)
+    n = floor(Int, log(1 / rate, length(prms))) + 1
     @debug "Start successive halving"
     for i in OneTo(n)
-        args = getbudget(budget, rate, i, n)
+        args = getbudget(budget, rate, m, length(arms))
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" prms args loss
         
         inds = sortperm(loss, rev=maximize)
-        arms = _halve!(arms[inds])
-        prms = _halve!(prms[inds])
+        arms = _discard!(arms[inds], rate)
+        prms = _discard!(prms[inds], rate)
     end
     @debug "Finished successive halving"
 
