@@ -470,7 +470,7 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     arms = map(x -> T(; x...), prms)
 
     m = length(arms)
-    n = floor(Int, log(1 / rate, length(arms))) + 1
+    n = floor(Int, log(1 / rate, m)) + 1
     @debug "Start successive halving"
     for _ in OneTo(n)
         args = getbudget(budget, rate, m, length(arms))
