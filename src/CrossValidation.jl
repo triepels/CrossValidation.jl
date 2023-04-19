@@ -443,12 +443,13 @@ end
 
 function schedule(budget::GeometricBudget{names, T}, narms, rate) where {names, T}
     n = floor(Int, log(1 / rate, narms)) + 1
-    args = Vector{NamedTuple{names, T}}(undef, n)
+    brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, n)
     for i in OneTo(n)
-        k = ceil(Int, narms * rate^(i - 1))
-        args[i] = NamedTuple{names}(map(x -> _cast(typeof(x), x / (k * n)), budget.args))
+        k = ceil(Int, narms * rate^i)
+        args = NamedTuple{names}(map(x -> _cast(typeof(x), x / (k * n)), budget.args))
+        brkt[i] = (k, args)
     end
-    return args
+    return brkt
 end
 
 struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
@@ -462,11 +463,14 @@ end
 function schedule(budget::ConstantBudget{names, T}, narms, rate) where {names, T}
     n = floor(Int, log(1 / rate, narms)) + 1
     c = (1 - rate) / (narms * (1 - rate^n))
-    args = fill(NamedTuple{names}(map(x -> _cast(typeof(x), x * c), budget.args)), n)
-    return args
+    brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, n)
+    for i in OneTo(n)
+        k = ceil(Int, narms * rate^i)
+        args = NamedTuple{names}(map(x -> _cast(typeof(x), x * c), budget.args))
+        brkt[i] = (k, args)
+    end
+    return brkt
 end
-
-_discard!(x, rate) = resize!(x, round(Int, rate * length(x), RoundNearestTiesUp))
 
 function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
@@ -476,14 +480,14 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     arms = map(x -> T(; x...), prms)
 
     @debug "Start successive halving"
-    for args in schedule(budget, length(arms), rate)
+    for (k, args) in schedule(budget, length(arms), rate)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" prms args loss
 
         inds = sortperm(loss, rev=maximize)
-        arms = _discard!(arms[inds], rate)
-        prms = _discard!(prms[inds], rate)
+        arms = arms[inds[OneTo(k)]]
+        prms = prms[inds[OneTo(k)]]
     end
     @debug "Finished successive halving"
 
