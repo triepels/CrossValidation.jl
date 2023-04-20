@@ -546,11 +546,11 @@ function hyperband(T::Type, space::DiscreteSpace, data::AbstractResampler, budge
 
     train, test = first(data)
     bmax = floor(Int, log(1 / rate, length(space))) + 1
-    println("bmax: $bmax")
+
     @debug "Start hyperband"
     for b in reverse(OneTo(bmax))
         n = ceil(Int, bmax * (1 / rate)^(b - 1) / b)
-        println("n: $n")
+
         loss = nothing
         prms = sample(space, n)
         arms = map(x -> T(; x...), prms)
