@@ -31,14 +31,16 @@ x = rand(2, 100)
 
 validate(MyModel(2.0, 2.0), FixedSplit(x), epochs = 100)
 
-space = DiscreteSpace(a = -6.0:0.5:6.0, b = -6.0:0.5:6.0)
+space = DiscreteSpace(a = -4.0:1.0:4.0, b = -4.0:1.0:4.0)
 
 brute(MyModel, space, FixedSplit(x), false, epochs = 100)
-brute(MyModel, sample(space, 100), FixedSplit(x), false, epochs = 100)
+brute(MyModel, sample(space, 64), FixedSplit(x), false, epochs = 100)
 hc(MyModel, space, FixedSplit(x), 1, 1, false, epochs = 100)
 
-sha(MyModel, space, FixedSplit(x), ConstantBudget(epochs = 10000), 0.5, false)
-sha(MyModel, sample(space, 100), FixedSplit(x), GeometricBudget(epochs = 1000), 0.5, false)
+sha(MyModel, space, FixedSplit(x), ConstantBudget(epochs = 567), 0.5, false)
+sha(MyModel, sample(space, 64), FixedSplit(x), GeometricBudget(epochs = 448), 0.5, false)
+
+hyperband(MyModel, space, FixedSplit(x), HyperBudget(epochs = 405), 1/3, false)
 
 sasha(MyModel, space, FixedSplit(x), 1, false, epochs = 1)
 
