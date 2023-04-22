@@ -259,7 +259,7 @@ _sample(iter, n) = _sample(GLOBAL_RNG, iter, n)
 
 function sample(rng::AbstractRNG, space::DiscreteSpace, n::Int)
     m = length(space)
-    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
+    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from space"))
     return [space[i] for i in _sample(rng, OneTo(length(space)), n)]
 end
 
@@ -449,17 +449,17 @@ function GeometricBudget(; args...)
     return GeometricBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-function _schedule(budget::GeometricBudget{names, T}, narms, rate) where {names, T}
-    n = floor(Int, log(1 / rate, narms)) + 1
-    return _schedule(budget, n, n, narms, rate)
+function _schedule(budget::GeometricBudget{names, T}, n, rate) where {names, T}
+    b = floor(Int, log(rate, n)) + 1
+    return _schedule(budget, b, n, rate)
 end
 
-function _schedule(budget::GeometricBudget{names, T}, bmax, b, narms, rate) where {names, T}
+function _schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T}
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
-        k = ceil(Int, narms * rate^(i - 1))
+        k = ceil(Int, n / rate^(i - 1))
         args = NamedTuple{names}(map(x -> _cast(typeof(x), x / (k * b), RoundDown), budget.args))
-        brkt[i] = (ceil(Int, narms * rate^i), args)
+        brkt[i] = (ceil(Int, k / rate), args)
     end
     return brkt
 end
@@ -472,22 +472,22 @@ function ConstantBudget(; args...)
     return ConstantBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-function _schedule(budget::ConstantBudget{names, T}, narms, rate) where {names, T}
-    n = floor(Int, log(1 / rate, narms)) + 1
-    return _schedule(budget, n, n, narms, rate)
+function _schedule(budget::ConstantBudget{names, T}, n, rate) where {names, T}
+    b = floor(Int, log(rate, n)) + 1
+    return _schedule(budget, b, n, rate)
 end
 
-function _schedule(budget::ConstantBudget{names, T}, bmax, b, narms, rate) where {names, T}
-    c = (1 - rate) / (narms * (1 - rate^b))
+function _schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
+    c = (rate - 1) * rate^(b - 1) / (n * (rate^b - 1))
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
         args = NamedTuple{names}(map(x -> _cast(typeof(x), c * x, RoundDown), budget.args))
-        brkt[i] = (ceil(Int, narms * rate^i), args)
+        brkt[i] = (ceil(Int, n / rate^i), args)
     end
     return brkt
 end
 
-struct HyperBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
+struct HyperBudget{names, T<:NTuple{1, Number}} <: AbstractBudget
     args::T
 end
 
@@ -495,17 +495,17 @@ function HyperBudget(; args...)
     return HyperBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-function _schedule(budget::HyperBudget{names, T}, narms, rate) where {names, T}
-    n = floor(Int, log(1 / rate, narms)) + 1
-    return _schedule(budget, n, n, narms, rate)
+function _schedule(budget::HyperBudget{names, T}, n, rate) where {names, T}
+    b = floor(Int, log(rate, budget.args[1])) + 1
+    return _schedule(budget, b, n, rate)
 end
 
-function _schedule(budget::HyperBudget{names, T}, bmax, b, narms, rate) where {names, T}
+function _schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
-        c = rate^(b - i) / bmax
+        c = rate^(i - b)
         args = NamedTuple{names}(map(x -> _cast(typeof(x), c * x, RoundNearest), budget.args))
-        brkt[i] = (ceil(Int, narms * rate^i), args)
+        brkt[i] = (ceil(Int, n * rate^-i), args)
     end
     return brkt
 end
@@ -513,13 +513,13 @@ end
 function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
-    0 < rate < 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
+    rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     train, test = first(data)
     arms = map(x -> T(; x...), prms)
 
     @debug "Start successive halving"
-    for (k, args) in _schedule(budget, length(arms), rate)
+    for (k, args) in _schedule(budget, length(arms), float(rate))
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" prms args loss
@@ -530,33 +530,32 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     end
     @debug "Finished successive halving"
 
-    return first(prms)
+    return prms[1]
 end
 
 sha(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
     sha(T, collect(space), data, budget, rate, maximize)
 
-function hyperband(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true)
-    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true)
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
-    0 < rate < 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
+    rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     parm = nothing
     best = maximize ? -Inf : Inf
 
     train, test = first(data)
-    bmax = floor(Int, log(1 / rate, length(space))) + 1
+    m = floor(Int, log(rate, budget.args[1])) + 1
 
     @debug "Start hyperband"
-    for b in reverse(OneTo(bmax))
-        n = ceil(Int, bmax * (1 / rate)^(b - 1) / b)
+    for b in reverse(OneTo(m))
+        n = ceil(Int, m * rate^(b - 1) / b)
 
         loss = nothing
         prms = sample(space, n)
         arms = map(x -> T(; x...), prms)
         
         @debug "Start successive halving"
-        for (k, args) in _schedule(budget, bmax, b, length(arms), rate)
+        for (k, args) in _schedule(budget, b, n, float(rate))
             arms = pmap(x -> _fit!(x, train, args), arms)
             loss = map(x -> _loss(x, test), arms)
             @debug "Validated arms" prms args loss
