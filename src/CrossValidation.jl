@@ -346,7 +346,7 @@ end
 function brute(T::Type, prms::ParameterVector, data::AbstractResampler, maximize::Bool = true; args...)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
-    loss = _val(T, prms, data, args)
+    loss = _val(T, prms, data, values(args))
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     return prms[ind]
