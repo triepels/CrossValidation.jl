@@ -55,7 +55,7 @@ validate(KFold(x)) do train
 end
 
 validate(KFold(x)) do train
-    prms = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs = 100), 0.5, false)
+    prms = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs = 100), 2, false)
     return fit!(MyModel(prms...), train)
 end
 
