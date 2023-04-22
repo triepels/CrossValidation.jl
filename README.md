@@ -65,6 +65,7 @@ The following optimizers are available:
 * Random Search
 * Hill-Climbing (HC)
 * Successive Halving (SHA)
+* Hyperband
 * Simulated Annealing and Successive Halving (SASHA)
 
 # Note
