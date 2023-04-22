@@ -536,7 +536,7 @@ end
 sha(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
     sha(T, collect(space), data, budget, rate, maximize)
 
-function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true)
+function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::HyperBudget, rate::Number, maximize::Bool = true)
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
