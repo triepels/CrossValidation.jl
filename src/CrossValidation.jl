@@ -449,12 +449,12 @@ function GeometricBudget(; args...)
     return GeometricBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-function _schedule(budget::GeometricBudget{names, T}, n, rate) where {names, T}
+function schedule(budget::GeometricBudget{names, T}, n, rate) where {names, T}
     b = floor(Int, log(rate, n)) + 1
-    return _schedule(budget, b, n, rate)
+    return schedule(budget, b, n, rate)
 end
 
-function _schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T}
+function schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T}
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
         k = ceil(Int, n / rate^(i - 1))
@@ -472,12 +472,12 @@ function ConstantBudget(; args...)
     return ConstantBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-function _schedule(budget::ConstantBudget{names, T}, n, rate) where {names, T}
+function schedule(budget::ConstantBudget{names, T}, n, rate) where {names, T}
     b = floor(Int, log(rate, n)) + 1
-    return _schedule(budget, b, n, rate)
+    return schedule(budget, b, n, rate)
 end
 
-function _schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
+function schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
     c = (rate - 1) * rate^(b - 1) / (n * (rate^b - 1))
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
@@ -495,12 +495,12 @@ function HyperBudget(; args...)
     return HyperBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
-function _schedule(budget::HyperBudget{names, T}, n, rate) where {names, T}
+function schedule(budget::HyperBudget{names, T}, n, rate) where {names, T}
     b = floor(Int, log(rate, budget.args[1])) + 1
-    return _schedule(budget, b, n, rate)
+    return schedule(budget, b, n, rate)
 end
 
-function _schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
+function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
         c = rate^(i - b)
@@ -519,7 +519,7 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     arms = map(x -> T(; x...), prms)
 
     @debug "Start successive halving"
-    for (k, args) in _schedule(budget, length(arms), float(rate))
+    for (k, args) in schedule(budget, length(arms), float(rate))
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" prms args loss
@@ -555,7 +555,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
         arms = map(x -> T(; x...), prms)
         
         @debug "Start successive halving"
-        for (k, args) in _schedule(budget, b, n, float(rate))
+        for (k, args) in schedule(budget, b, n, float(rate))
             arms = pmap(x -> _fit!(x, train, args), arms)
             loss = map(x -> _loss(x, test), arms)
             @debug "Validated arms" prms args loss
