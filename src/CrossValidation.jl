@@ -461,7 +461,7 @@ function schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
         k = ceil(Int, n / rate^(i - 1))
-        args = NamedTuple{names}(map(x -> _cast(typeof(x), x / (k * b), RoundDown), budget.args))
+        args = NamedTuple{names, T}(map(x -> _cast(typeof(x), x / (k * b), RoundDown), budget.args))
         brkt[i] = (ceil(Int, k / rate), args)
     end
     return brkt
@@ -484,7 +484,7 @@ function schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
     c = (rate - 1) * rate^(b - 1) / (n * (rate^b - 1))
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
-        args = NamedTuple{names}(map(x -> _cast(typeof(x), c * x, RoundDown), budget.args))
+        args = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundDown), budget.args))
         brkt[i] = (ceil(Int, n / rate^i), args)
     end
     return brkt
@@ -507,7 +507,7 @@ function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
         c = rate^(i - b)
-        args = NamedTuple{names}(map(x -> _cast(typeof(x), c * x, RoundNearest), budget.args))
+        args = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundNearest), budget.args))
         brkt[i] = (ceil(Int, n * rate^-i), args)
     end
     return brkt
