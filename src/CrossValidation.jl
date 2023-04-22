@@ -8,6 +8,7 @@ import Random: rand
 
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, DiscreteSpace, ContinousSpace, MixedSpace, ParameterVector,
+       AbstractBudget, AbstractRoundBudget, AbstractOverallBudget, schedule,
        AbstractDistribution, Uniform, Normal, sample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
 
@@ -436,12 +437,14 @@ end
 
 abstract type AbstractBudget end
 
+abstract type AbstractRoundBudget <: AbstractBudget end
+abstract type AbstractOverallBudget <: AbstractBudget end
 
 _cast(T::Type{A}, x::Integer, r::RoundingMode) where A <: AbstractFloat = T(x)
 _cast(T::Type{A}, x::AbstractFloat, r::RoundingMode) where A <: Integer = round(T, x, r)
 _cast(T::Type{A}, x::Number, r::RoundingMode) where A <: Number = x
 
-struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
+struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractOverallBudget
     args::T
 end
 
@@ -464,7 +467,7 @@ function schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T
     return brkt
 end
 
-struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
+struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractOverallBudget
     args::T
 end
 
@@ -487,7 +490,7 @@ function schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
     return brkt
 end
 
-struct HyperBudget{names, T<:NTuple{1, Number}} <: AbstractBudget
+struct HyperBudget{names, T<:NTuple{1, Number}} <: AbstractRoundBudget
     args::T
 end
 
@@ -536,7 +539,7 @@ end
 sha(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
     sha(T, collect(space), data, budget, rate, maximize)
 
-function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::HyperBudget, rate::Number, maximize::Bool = true)
+function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractRoundBudget, rate::Number, maximize::Bool = true)
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
