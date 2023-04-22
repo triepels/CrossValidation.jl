@@ -357,7 +357,7 @@ brute(T::Type, space::DiscreteSpace, data::AbstractResampler, maximize::Bool = t
 
 function _neighbors(space, ref, k, bl)
     dim = size(space)
-    inds = sizehint!(Int[], sum(min.(dim, 2 * k)))
+    inds = sizehint!(Int[], sum(min.(dim .- 1, 2 * k)))
     @inbounds for i in eachindex(dim)
         if i == 1
             d = mod(ref - 1, dim[1]) + 1
