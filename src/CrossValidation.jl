@@ -215,6 +215,7 @@ vars(s::DiscreteSpace) = s.vars
 Base.eltype(::Type{DiscreteSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
 Base.length(s::DiscreteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
 
+Base.keys(s::DiscreteSpace) = OneTo(length(s))
 Base.firstindex(s::DiscreteSpace) = 1
 Base.lastindex(s::DiscreteSpace) = length(s)
 
@@ -355,11 +356,8 @@ brute(T::Type, space::DiscreteSpace, data::AbstractResampler, maximize::Bool = t
     brute(T, collect(space), data, maximize; args...)
 
 function _neighbors(space, ref, k, bl)
-    if k > length(space)
-        return Subspace(space, setdiff(keys(space), rand(keys(space))))
-    end
     dim = size(space)
-    inds = sizehint!(Int[], 2 * k * length(dim))
+    inds = sizehint!(Int[], min(2 * k * length(dim), length(space)))
     @inbounds for i in eachindex(dim)
         if i == 1
             d = mod(ref - 1, dim[1]) + 1
