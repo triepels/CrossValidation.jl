@@ -40,7 +40,7 @@ hc(MyModel, space, FixedSplit(x), 1, 1, false, epochs = 100)
 sha(MyModel, space, FixedSplit(x), ConstantBudget(epochs = 567), 0.5, false)
 sha(MyModel, sample(space, 64), FixedSplit(x), GeometricBudget(epochs = 448), 0.5, false)
 
-hyperband(MyModel, space, FixedSplit(x), HyperBudget(epochs = 81), 1/3, false)
+hyperband(MyModel, space, FixedSplit(x), HyperBudget(epochs = 81), 3, false)
 
 sasha(MyModel, space, FixedSplit(x), 1, false, epochs = 1)
 
