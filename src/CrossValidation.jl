@@ -616,7 +616,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
 
     budget = map(x -> n * x, values(args))
 
-    return first(prms), budget
+    return prms[1], budget
 end
 
 sasha(T::Type, space::DiscreteSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...) =
