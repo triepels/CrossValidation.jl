@@ -233,6 +233,11 @@ end
     return s[state], state + 1
 end
 
+rand(rng::AbstractRNG, space::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
+
+sample(rng::AbstractRNG, space::FiniteSpace) = rand(rng, space)
+sample(space::FiniteSpace) = sample(GLOBAL_RNG, space)
+
 function _sample(rng, iter, n)
     m = length(iter)
     if n == m
@@ -250,9 +255,6 @@ function _sample(rng, iter, n)
 end
 
 _sample(iter, n) = _sample(GLOBAL_RNG, iter, n)
-
-sample(rng::AbstractRNG, space::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
-sample(space::FiniteSpace) = sample(GLOBAL_RNG, space)
 
 function sample(rng::AbstractRNG, space::FiniteSpace, n::Int)
     m = length(space)
@@ -286,7 +288,9 @@ function InfiniteSpace(; vars...)
     return InfiniteSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
 end
 
-sample(rng::AbstractRNG, space::InfiniteSpace{names}) where names = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
+rand(rng::AbstractRNG, space::InfiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
+
+sample(rng::AbstractRNG, space::InfiniteSpace) = rand(rng, space)
 sample(space::InfiniteSpace) = sample(GLOBAL_RNG, space)
 
 sample(rng::AbstractRNG, space::InfiniteSpace, n::Int) = [sample(rng, space) for _ in OneTo(n)]
