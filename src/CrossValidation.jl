@@ -7,7 +7,7 @@ using Distributed: @distributed, pmap
 import Random: rand
 
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
-       AbstractSpace, DiscreteSpace, ContinousSpace, MixedSpace, ParameterVector,
+       AbstractSpace, FiniteSpace, InfiniteSpace, ParameterVector,
        AbstractBudget, AbstractRoundBudget, AbstractOverallBudget, schedule,
        AbstractDistribution, Uniform, Normal, sample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
@@ -194,49 +194,41 @@ end
     return (train, test), state + 1
 end
 
-abstract type AbstractSpace{names} end
+abstract type AbstractSpace end
 
-sample(rng::AbstractRNG, space::AbstractSpace{names}) where names = NamedTuple{names}(map(x -> rand(rng, x), vars(space)))
-sample(space::AbstractSpace{names}) where names = sample(GLOBAL_RNG, space)
-
-sample(rng::AbstractRNG, space::AbstractSpace, n::Int) = [sample(rng, space) for _ in OneTo(n)]
-sample(space::AbstractSpace, n::Int) = sample(GLOBAL_RNG, space, n)
-
-struct DiscreteSpace{names, T<:Tuple} <: AbstractSpace{names}
+struct FiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
 end
 
-function DiscreteSpace(; vars...)
-    return DiscreteSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
+function FiniteSpace(; vars...)
+    return FiniteSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
 end
 
-vars(s::DiscreteSpace) = s.vars
+Base.eltype(::Type{FiniteSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
+Base.length(s::FiniteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
 
-Base.eltype(::Type{DiscreteSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
-Base.length(s::DiscreteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
+Base.keys(s::FiniteSpace) = OneTo(length(s))
+Base.firstindex(s::FiniteSpace) = 1
+Base.lastindex(s::FiniteSpace) = length(s)
 
-Base.keys(s::DiscreteSpace) = OneTo(length(s))
-Base.firstindex(s::DiscreteSpace) = 1
-Base.lastindex(s::DiscreteSpace) = length(s)
+Base.size(s::FiniteSpace) = length(s.vars) == 0 ? (0,) : map(length, s.vars)
 
-Base.size(s::DiscreteSpace) = length(s.vars) == 0 ? (0,) : map(length, s.vars)
-
-@inline function Base.getindex(s::DiscreteSpace{names, T}, i::Int) where {names, T}
+@inline function Base.getindex(s::FiniteSpace{names, T}, i::Int) where {names, T}
     @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
     strides = (1, cumprod(map(length, Base.front(s.vars)))...)
     return NamedTuple{names}(map(getindex, s.vars, mod.((i - 1) .÷ strides, size(s)) .+ 1))
 end
 
-@inline function Base.getindex(s::DiscreteSpace{names, T}, I::Vararg{Int, N}) where {names, T, N}
+@inline function Base.getindex(s::FiniteSpace{names, T}, I::Vararg{Int, N}) where {names, T, N}
     @boundscheck length(I) == length(s.vars) && all(1 .≤ I .≤ size(s)) || throw(BoundsError(s, I))
     return NamedTuple{names}(map(getindex, s.vars, I))
 end
 
-@inline function Base.getindex(s::DiscreteSpace{names, T}, inds::Vector{Int}) where {names, T}
+@inline function Base.getindex(s::FiniteSpace{names, T}, inds::Vector{Int}) where {names, T}
     return [s[i] for i in inds]
 end
 
-@propagate_inbounds function Base.iterate(s::DiscreteSpace, state = 1)
+@propagate_inbounds function Base.iterate(s::FiniteSpace, state = 1)
     state > length(s) && return nothing
     return s[state], state + 1
 end
@@ -259,13 +251,16 @@ end
 
 _sample(iter, n) = _sample(GLOBAL_RNG, iter, n)
 
-function sample(rng::AbstractRNG, space::DiscreteSpace, n::Int)
+sample(rng::AbstractRNG, space::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
+sample(space::FiniteSpace) = sample(GLOBAL_RNG, space)
+
+function sample(rng::AbstractRNG, space::FiniteSpace, n::Int)
     m = length(space)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from space"))
     return [space[i] for i in _sample(rng, OneTo(length(space)), n)]
 end
 
-sample(space::DiscreteSpace, n::Int) = sample(GLOBAL_RNG, space, n)
+sample(space::FiniteSpace, n::Int) = sample(GLOBAL_RNG, space, n)
 
 abstract type AbstractDistribution end
 
@@ -283,25 +278,19 @@ end
 
 rand(rng::AbstractRNG, d::Normal{T}) where T = d.mean + d.std * randn(rng, float(T))
 
-struct ContinousSpace{names, T<:Tuple{Vararg{AbstractDistribution}}} <: AbstractSpace{names}
+struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
 end
 
-function ContinousSpace(; vars...)
-    return ContinousSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
+function InfiniteSpace(; vars...)
+    return InfiniteSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
 end
 
-vars(s::ContinousSpace) = s.vars
+sample(rng::AbstractRNG, space::InfiniteSpace{names}) where names = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
+sample(space::InfiniteSpace) = sample(GLOBAL_RNG, space)
 
-struct MixedSpace{names, T<:Tuple} <: AbstractSpace{names}
-    vars::T
-end
-
-function MixedSpace(; vars...)
-    return MixedSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
-end
-
-vars(s::MixedSpace) = s.vars
+sample(rng::AbstractRNG, space::InfiniteSpace, n::Int) = [sample(rng, space) for _ in OneTo(n)]
+sample(space::InfiniteSpace, n::Int) = sample(GLOBAL_RNG, space, n)
 
 const ParameterVector = Array{NamedTuple{names, T}, 1} where {names, T}
 
@@ -352,7 +341,7 @@ function brute(T::Type, prms::ParameterVector, data::AbstractResampler, maximize
     return prms[ind]
 end
 
-brute(T::Type, space::DiscreteSpace, data::AbstractResampler, maximize::Bool = true; args...) =
+brute(T::Type, space::FiniteSpace, data::AbstractResampler, maximize::Bool = true; args...) =
     brute(T, collect(space), data, maximize; args...)
 
 function _neighbors(space, ref, k, bl)
@@ -400,7 +389,7 @@ function _neighbors(space, ref, k, bl)
     return inds
 end
 
-function hc(T::Type, space::DiscreteSpace, data::AbstractResampler, nstart::Int = 1, k::Int = 1, maximize::Bool = true; args...)
+function hc(T::Type, space::FiniteSpace, data::AbstractResampler, nstart::Int = 1, k::Int = 1, maximize::Bool = true; args...)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
 
@@ -534,7 +523,7 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     return prms[1]
 end
 
-sha(T::Type, space::DiscreteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
+sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
     sha(T, collect(space), data, budget, rate, maximize)
 
 function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractRoundBudget, rate::Number, maximize::Bool = true)
@@ -616,7 +605,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
     return prms[1], budget
 end
 
-sasha(T::Type, space::DiscreteSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...) =
+sasha(T::Type, space::FiniteSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...) =
     sasha(T, collect(space), data, temp, maximize; args...)
 
 end
