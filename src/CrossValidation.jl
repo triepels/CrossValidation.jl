@@ -264,19 +264,19 @@ sample(space::FiniteSpace, n::Int) = sample(GLOBAL_RNG, space, n)
 
 abstract type AbstractDistribution end
 
-struct Uniform{T<:Number} <: AbstractDistribution
+struct Uniform{T<:AbstractFloat} <: AbstractDistribution
     a::T
     b::T
 end
 
-rand(rng::AbstractRNG, d::Uniform{T}) where T = d.a + (d.b - d.a) * rand(rng, float(T))
+rand(rng::AbstractRNG, d::Uniform{T}) where T = d.a + (d.b - d.a) * rand(rng, T)
 
-struct Normal{T<:Number} <: AbstractDistribution
+struct Normal{T<:AbstractFloat} <: AbstractDistribution
     mean::T
     std::T
 end
 
-rand(rng::AbstractRNG, d::Normal{T}) where T = d.mean + d.std * randn(rng, float(T))
+rand(rng::AbstractRNG, d::Normal{T}) where T = d.mean + d.std * randn(rng, T)
 
 struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
