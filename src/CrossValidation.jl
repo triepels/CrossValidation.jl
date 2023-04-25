@@ -604,7 +604,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
         n += 1
     end
 
-    budget = map(x -> n * x, values(args))
+    budget = map(x -> (n - 1) * x, values(args))
 
     return prms[1], budget
 end
