@@ -499,7 +499,7 @@ function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     for i in OneTo(b)
         c = rate^(i - b)
         args = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundNearest), budget.args))
-        brkt[i] = (ceil(Int, n / rate^i), args)
+        brkt[i] = (floor(Int, n / rate^i), args)
     end
     return brkt
 end
