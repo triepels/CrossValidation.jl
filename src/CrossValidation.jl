@@ -342,7 +342,7 @@ function brute(T::Type, prms::ParameterVector, data::AbstractResampler, maximize
     loss = _val(T, prms, data, values(args))
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
-    return prms[ind]
+    return prms[ind], values(args)
 end
 
 brute(T::Type, space::FiniteSpace, data::AbstractResampler, maximize::Bool = true; args...) =
@@ -423,7 +423,7 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler, nstart::Int = 
     end
     @debug "Finished hill-climbing"
 
-    return parm
+    return parm, values(args)
 end
 
 abstract type AbstractBudget end
@@ -449,13 +449,14 @@ function schedule(budget::GeometricBudget{names, T}, n, rate) where {names, T}
 end
 
 function schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T}
-    brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
+    k = Vector{Int}(undef, b)
+    args = Vector{NamedTuple{names, T}}(undef, b)
     for i in OneTo(b)
-        k = ceil(Int, n / rate^(i - 1))
-        args = NamedTuple{names, T}(map(x -> _cast(typeof(x), x / (k * b), RoundDown), budget.args))
-        brkt[i] = (ceil(Int, k / rate), args)
+        c = ceil(Int, n / rate^(i - 1))
+        args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), x / (c * b), RoundDown), budget.args))
+        k[i] = ceil(Int, c / rate)
     end
-    return brkt
+    return k, args
 end
 
 struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractOverallBudget
@@ -472,13 +473,14 @@ function schedule(budget::ConstantBudget{names, T}, n, rate) where {names, T}
 end
 
 function schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
+    k = Vector{Int}(undef, b)
+    args = Vector{NamedTuple{names, T}}(undef, b)
     c = (rate - 1) * rate^(b - 1) / (n * (rate^b - 1))
-    brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
     for i in OneTo(b)
-        args = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundDown), budget.args))
-        brkt[i] = (ceil(Int, n / rate^i), args)
+        args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundDown), budget.args))
+        k[i] = ceil(Int, n / rate^i)
     end
-    return brkt
+    return k, args
 end
 
 struct HyperBudget{names, T<:NTuple{1, Number}} <: AbstractRoundBudget
@@ -495,14 +497,17 @@ function schedule(budget::HyperBudget{names, T}, n, rate) where {names, T}
 end
 
 function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
-    brkt = Vector{Tuple{Int, NamedTuple{names, T}}}(undef, b)
+    k = Vector{Int}(undef, b)
+    args = Vector{NamedTuple{names, T}}(undef, b)
     for i in OneTo(b)
         c = rate^(i - b)
-        args = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundNearest), budget.args))
-        brkt[i] = (max(floor(Int, n / rate^i), 1), args)
+        args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundNearest), budget.args))
+        k[i] = max(floor(Int, n / rate^i), 1)
     end
-    return brkt
+    return k, args
 end
+
+_reduce_args(f, iter::Vector{NamedTuple{names, T}}) where {names, T} = NamedTuple{names, T}(reduce((x, y) -> f(values(x), values(y)), iter))
 
 function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
@@ -512,8 +517,10 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     train, test = first(data)
     arms = map(x -> T(; x...), prms)
 
+    bracket = schedule(budget, length(arms), float(rate))
+
     @debug "Start successive halving"
-    for (k, args) in schedule(budget, length(arms), float(rate))
+    for (k, args) in zip(bracket...)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" prms args loss
@@ -524,7 +531,9 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     end
     @debug "Finished successive halving"
 
-    return prms[1]
+    argm = _reduce_args(.+, bracket[2])
+
+    return prms[1], argm
 end
 
 sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
@@ -535,6 +544,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     parm = nothing
+    argm = nothing
     best = maximize ? -Inf : Inf
 
     train, test = first(data)
@@ -548,8 +558,10 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
         prms = sample(space, n)
         arms = map(x -> T(; x...), prms)
         
+        bracket = schedule(budget, b, n, float(rate))
+
         @debug "Start successive halving"
-        for (k, args) in schedule(budget, b, n, float(rate))
+        for (k, args) in zip(bracket...)
             arms = pmap(x -> _fit!(x, train, args), arms)
             loss = map(x -> _loss(x, test), arms)
             @debug "Validated arms" prms args loss
@@ -558,23 +570,22 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
             arms = arms[inds[OneTo(k)]]
             prms = prms[inds[OneTo(k)]]    
         end
+        @debug "Finished successive halving"
 
         if maximize
-            if loss[1] > best
-                parm = prms[1]
-                best = loss[1]
-            end
+            loss[1] > best || continue
         else
-            if loss[1] < best
-                parm = prms[1]
-                best = loss[1]
-            end
+            loss[1] < best || continue
         end
-        @debug "Finished successive halving"
+
+        argm = _reduce_args(.+, bracket[2])
+
+        parm = prms[1]
+        best = loss[1]
     end
     @debug "Finished hyperband"
 
-    return parm
+    return parm, argm
 end
 
 function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
@@ -604,9 +615,9 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
         n += 1
     end
 
-    budget = map(x -> (n - 1) * x, values(args))
+    argm = map(x -> (n - 1) * x, values(args))
 
-    return prms[1], budget
+    return prms[1], argm
 end
 
 sasha(T::Type, space::FiniteSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...) =
