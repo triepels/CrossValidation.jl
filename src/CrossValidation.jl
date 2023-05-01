@@ -600,13 +600,14 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
     while length(arms) > 1
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
-        @debug "Validated arms" prms prob loss
 
         if maximize
             prob = exp.(n .* (loss .- max(loss...)) ./ temp)
         else
             prob = exp.(-n .* (loss .- min(loss...)) ./ temp)
         end        
+
+        @debug "Validated arms" prms prob loss
 
         inds = findall(rand(length(prob)) .≤ prob)
         arms = arms[inds]
