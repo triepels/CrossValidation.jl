@@ -597,6 +597,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
     arms = map(x -> T(; x...), prms)
 
     n = 1
+    @debug "Start SASHA"
     while length(arms) > 1
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
@@ -615,6 +616,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
 
         n += 1
     end
+    @debug "Finished SASHA"
 
     argm = map(x -> (n - 1) * x, values(args))
 
