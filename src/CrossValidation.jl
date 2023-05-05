@@ -236,10 +236,10 @@ end
 rand(rng::AbstractRNG, space::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
 
 sample(rng::AbstractRNG, space::FiniteSpace) = rand(rng, space)
-sample(space::FiniteSpace) = sample(GLOBAL_RNG, space)
 
-function _sample(rng, iter, n)
+function sample(rng::AbstractRNG, iter::Any, n::Integer)
     m = length(iter)
+    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
     if n == m
         return shuffle!(collect(iter))
     end
@@ -254,15 +254,9 @@ function _sample(rng, iter, n)
     return vals
 end
 
-_sample(iter, n) = _sample(GLOBAL_RNG, iter, n)
+sample(iter, n) = sample(GLOBAL_RNG, iter, n)
 
-function sample(rng::AbstractRNG, space::FiniteSpace, n::Int)
-    m = length(space)
-    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement from space"))
-    return [space[i] for i in _sample(rng, OneTo(length(space)), n)]
-end
-
-sample(space::FiniteSpace, n::Int) = sample(GLOBAL_RNG, space, n)
+sample(rng::AbstractRNG, space::FiniteSpace, n::Int) = [space[i] for i in sample(rng, OneTo(length(space)), n)]
 
 abstract type AbstractDistribution end
 
@@ -401,7 +395,7 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler, nstart::Int = 
     parm = nothing
     best = maximize ? -Inf : Inf
 
-    cand = _sample(OneTo(length(space)), nstart)
+    cand = sample(OneTo(length(space)), nstart)
 
     @debug "Start hill-climbing"
     while !isempty(cand)
