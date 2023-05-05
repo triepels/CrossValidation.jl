@@ -194,6 +194,26 @@ end
     return (train, test), state + 1
 end
 
+function sample(rng::AbstractRNG, iter::Any, n::Integer)
+    m = length(iter)
+    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
+    if n == m
+        return shuffle!(collect(iter))
+    end
+    vals = sizehint!(eltype(iter)[], n)
+    for _ in OneTo(n)
+        val = rand(rng, iter)
+        while val in vals
+            val = rand(rng, iter)
+        end
+        push!(vals, val)
+    end
+    return vals
+end
+
+sample(iter, n) = sample(GLOBAL_RNG, iter, n)
+sample(iter) = sample(iter, 1)
+
 abstract type AbstractSpace end
 
 struct FiniteSpace{names, T<:Tuple} <: AbstractSpace
@@ -236,26 +256,6 @@ end
 rand(rng::AbstractRNG, space::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
 
 sample(rng::AbstractRNG, space::FiniteSpace) = rand(rng, space)
-
-function sample(rng::AbstractRNG, iter::Any, n::Integer)
-    m = length(iter)
-    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
-    if n == m
-        return shuffle!(collect(iter))
-    end
-    vals = sizehint!(eltype(iter)[], n)
-    for _ in OneTo(n)
-        val = rand(rng, iter)
-        while val in vals
-            val = rand(rng, iter)
-        end
-        push!(vals, val)
-    end
-    return vals
-end
-
-sample(iter, n) = sample(GLOBAL_RNG, iter, n)
-
 sample(rng::AbstractRNG, space::FiniteSpace, n::Int) = [space[i] for i in sample(rng, OneTo(length(space)), n)]
 
 abstract type AbstractDistribution end
@@ -285,10 +285,7 @@ end
 rand(rng::AbstractRNG, space::InfiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
 
 sample(rng::AbstractRNG, space::InfiniteSpace) = rand(rng, space)
-sample(space::InfiniteSpace) = sample(GLOBAL_RNG, space)
-
 sample(rng::AbstractRNG, space::InfiniteSpace, n::Int) = [sample(rng, space) for _ in OneTo(n)]
-sample(space::InfiniteSpace, n::Int) = sample(GLOBAL_RNG, space, n)
 
 const ParameterVector = Array{NamedTuple{names, T}, 1} where {names, T}
 
