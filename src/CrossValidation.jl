@@ -46,8 +46,8 @@ end
 
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
     n = nobs(data)
-    0 < n * ratio < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return FixedSplit(data, n, ceil(Int, n * ratio))
+    1 < n * ratio < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
+    return FixedSplit(data, n, floor(Int, n * ratio))
 end
 
 function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
@@ -74,8 +74,8 @@ end
 
 function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
     n = nobs(data)
-    0 < ratio * n < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return RandomSplit(data, n, ceil(Int, ratio * n), shuffle!([OneTo(n);]))
+    1 < ratio * n < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
+    return RandomSplit(data, n, floor(Int, ratio * n), shuffle!([OneTo(n);]))
 end
 
 function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
