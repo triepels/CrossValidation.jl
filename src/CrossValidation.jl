@@ -294,7 +294,6 @@ _fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
 
 fit!(model, x) = throw(MethodError(fit!, (model, x)))
 
-
 _loss(model, x::AbstractArray) = loss(model, x)
 _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
@@ -420,14 +419,13 @@ end
 
 abstract type AbstractBudget end
 
-abstract type AbstractRoundBudget <: AbstractBudget end
-abstract type AbstractOverallBudget <: AbstractBudget end
+abstract type AbstractHyperBudget{names, T<:Number} <: AbstractBudget end
 
 _cast(T::Type{A}, x::Integer, r::RoundingMode) where A <: AbstractFloat = T(x)
 _cast(T::Type{A}, x::AbstractFloat, r::RoundingMode) where A <: Integer = round(T, x, r)
 _cast(T::Type{A}, x::Number, r::RoundingMode) where A <: Number = x
 
-struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractOverallBudget
+struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
     args::T
 end
 
@@ -451,7 +449,7 @@ function schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T
     return k, args
 end
 
-struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractOverallBudget
+struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
     args::T
 end
 
@@ -475,25 +473,25 @@ function schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
     return k, args
 end
 
-struct HyperBudget{names, T<:NTuple{1, Number}} <: AbstractRoundBudget
-    args::T
+struct HyperBudget{names, T} <: AbstractHyperBudget{names, T}
+    arg::T
 end
 
 function HyperBudget(; args...)
-    return HyperBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
+    return HyperBudget{keys(args), typeof(first(values(args)))}(first(values(args)))
 end
 
 function schedule(budget::HyperBudget{names, T}, n, rate) where {names, T}
-    b = floor(Int, log(rate, budget.args[1])) + 1
+    b = floor(Int, log(rate, budget.arg)) + 1
     return schedule(budget, b, n, rate)
 end
 
 function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     k = Vector{Int}(undef, b)
-    args = Vector{NamedTuple{names, T}}(undef, b)
+    args = Vector{NamedTuple{names, Tuple{T}}}(undef, b)
     for i in OneTo(b)
         c = rate^(i - b)
-        args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundNearest), budget.args))
+        args[i] = NamedTuple{names, Tuple{T}}(_cast(typeof(budget.arg), c * budget.arg, RoundNearest)) #RoundDown?
         k[i] = max(floor(Int, n / rate^i), 1)
     end
     return k, args
@@ -531,7 +529,7 @@ end
 sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
     sha(T, collect(space), data, budget, rate, maximize)
 
-function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractRoundBudget, rate::Number, maximize::Bool = true)
+function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractHyperBudget, rate::Number, maximize::Bool = true)
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
@@ -540,7 +538,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     best = maximize ? -Inf : Inf
 
     train, test = first(data)
-    m = floor(Int, log(rate, budget.args[1])) + 1
+    m = floor(Int, log(rate, budget.arg)) + 1
 
     @debug "Start hyperband"
     for b in reverse(OneTo(m))
