@@ -17,7 +17,7 @@ nobs(x::AbstractArray) = size(x)[end]
 
 function nobs(x::Union{Tuple, NamedTuple})
     equalobs(x) || throw(ArgumentError("all data should have the same number of observations"))
-    return nobs(fist(x))
+    return nobs(first(x))
 end
 
 function equalobs(x::Union{Tuple, NamedTuple})
