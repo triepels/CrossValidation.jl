@@ -292,12 +292,13 @@ const ParameterVector = Array{NamedTuple{names, T}, 1} where {names, T}
 _fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
 _fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
 
-fit!(model, x; args...) = throw(ErrorException("no fit! function defined for $(typeof(model))"))
+fit!(model, x) = throw(MethodError(fit!, (model, x)))
+
 
 _loss(model, x::AbstractArray) = loss(model, x)
 _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
-loss(model, x...) = throw(ErrorException("no loss function defined for $(typeof(model))"))
+loss(model, x) = throw(MethodError(loss, (model, x)))
 
 @inline function _val(T, prms, data, args)
     return sum(x -> _val_split(T, prms, x..., args), data) / length(data)
