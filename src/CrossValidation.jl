@@ -17,12 +17,12 @@ nobs(x::AbstractArray) = size(x)[end]
 
 function nobs(x::Union{Tuple, NamedTuple})
     equalobs(x) || throw(ArgumentError("all data should have the same number of observations"))
-    return nobs(x[1])
+    return nobs(fist(x))
 end
 
 function equalobs(x::Union{Tuple, NamedTuple})
     length(x) > 0 || return false
-    n = nobs(x[1])
+    n = nobs(first(x))
     return all(y -> nobs(y) == n, Base.tail(x))
 end
 
@@ -487,7 +487,7 @@ end
 Base.values(budget::HyperBudget) = budget.args
 
 function schedule(budget::HyperBudget{names, T}, n, rate) where {names, T}
-    b = floor(Int, log(rate, budget.args[1])) + 1
+    b = floor(Int, log(rate, first(budget.args))) + 1
     return schedule(budget, b, n, rate)
 end
 
@@ -496,7 +496,7 @@ function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     args = Vector{NamedTuple{names, T}}(undef, b)
     for i in OneTo(b)
         c = rate^(i - b)
-        args[i] = NamedTuple{names, T}(_cast(typeof(budget.args[1]), c * budget.args[1], RoundNearest)) #RoundDown?
+        args[i] = NamedTuple{names, T}(_cast(typeof(first(budget.args)), c * first(budget.args), RoundNearest)) #RoundDown?
         k[i] = max(floor(Int, n / rate^i), 1)
     end
     return k, args
@@ -528,7 +528,7 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
 
     argm = _reduce_args(.+, bracket[2])
 
-    return prms[1], argm
+    return first(prms), argm
 end
 
 sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
@@ -543,7 +543,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     best = maximize ? -Inf : Inf
 
     train, test = first(data)
-    m = floor(Int, log(rate, values(budget)[1])) + 1
+    m = floor(Int, log(rate, first(values(budget)))) + 1
 
     @debug "Start hyperband"
     for b in reverse(OneTo(m))
@@ -568,15 +568,15 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
         @debug "Finished successive halving"
 
         if maximize
-            loss[1] > best || continue
+            first(loss) > best || continue
         else
-            loss[1] < best || continue
+            first(loss) < best || continue
         end
 
         argm = _reduce_args(.+, bracket[2])
 
-        parm = prms[1]
-        best = loss[1]
+        parm = first(prms)
+        best = first(loss)
     end
     @debug "Finished hyperband"
 
@@ -615,7 +615,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
 
     argm = map(x -> (n - 1) * x, values(args))
 
-    return prms[1], argm
+    return first(prms), argm
 end
 
 sasha(T::Type, space::FiniteSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...) =
