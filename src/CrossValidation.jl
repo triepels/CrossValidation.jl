@@ -417,21 +417,22 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler, nstart::Int = 
     return parm, values(args)
 end
 
-abstract type AbstractBudget end
-
-abstract type AbstractHyperBudget{names, T<:Number} <: AbstractBudget end
+abstract type AbstractBudget{names, T<:Tuple{Vararg{Number}}} end
+abstract type AbstractHyperBudget{names, T<:Tuple{Number}} <: AbstractBudget{names, T} end
 
 _cast(T::Type{A}, x::Integer, r::RoundingMode) where A <: AbstractFloat = T(x)
 _cast(T::Type{A}, x::AbstractFloat, r::RoundingMode) where A <: Integer = round(T, x, r)
 _cast(T::Type{A}, x::Number, r::RoundingMode) where A <: Number = x
 
-struct GeometricBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
+struct GeometricBudget{names, T} <: AbstractBudget{names, T}
     args::T
 end
 
 function GeometricBudget(; args...)
     return GeometricBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
+
+Base.values(budget::GeometricBudget) = budget.args
 
 function schedule(budget::GeometricBudget{names, T}, n, rate) where {names, T}
     b = floor(Int, log(rate, n)) + 1
@@ -449,13 +450,15 @@ function schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T
     return k, args
 end
 
-struct ConstantBudget{names, T<:Tuple{Vararg{Number}}} <: AbstractBudget
+struct ConstantBudget{names, T} <: AbstractBudget{names, T}
     args::T
 end
 
 function ConstantBudget(; args...)
     return ConstantBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
+
+Base.values(budget::ConstantBudget) = budget.args
 
 function schedule(budget::ConstantBudget{names, T}, n, rate) where {names, T}
     b = floor(Int, log(rate, n)) + 1
@@ -474,24 +477,26 @@ function schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
 end
 
 struct HyperBudget{names, T} <: AbstractHyperBudget{names, T}
-    arg::T
+    args::T
 end
 
 function HyperBudget(; args...)
-    return HyperBudget{keys(args), typeof(first(values(args)))}(first(values(args)))
+    return HyperBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
 end
 
+Base.values(budget::HyperBudget) = budget.args
+
 function schedule(budget::HyperBudget{names, T}, n, rate) where {names, T}
-    b = floor(Int, log(rate, budget.arg)) + 1
+    b = floor(Int, log(rate, budget.args[1])) + 1
     return schedule(budget, b, n, rate)
 end
 
 function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     k = Vector{Int}(undef, b)
-    args = Vector{NamedTuple{names, Tuple{T}}}(undef, b)
+    args = Vector{NamedTuple{names, T}}(undef, b)
     for i in OneTo(b)
         c = rate^(i - b)
-        args[i] = NamedTuple{names, Tuple{T}}(_cast(typeof(budget.arg), c * budget.arg, RoundNearest)) #RoundDown?
+        args[i] = NamedTuple{names, T}(_cast(typeof(budget.args[1]), c * budget.args[1], RoundNearest)) #RoundDown?
         k[i] = max(floor(Int, n / rate^i), 1)
     end
     return k, args
@@ -538,7 +543,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     best = maximize ? -Inf : Inf
 
     train, test = first(data)
-    m = floor(Int, log(rate, budget.arg)) + 1
+    m = floor(Int, log(rate, values(budget)[1])) + 1
 
     @debug "Start hyperband"
     for b in reverse(OneTo(m))
