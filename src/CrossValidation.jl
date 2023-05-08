@@ -12,7 +12,7 @@ export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining
        AbstractDistribution, Uniform, Normal, sample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
 
-nobs(x::Any) = length(x)
+nobs(x) = length(x)
 nobs(x::AbstractArray) = size(x)[end]
 
 function nobs(x::Union{Tuple, NamedTuple})
@@ -24,11 +24,11 @@ function nobs(x::Union{Tuple, NamedTuple})
     return n
 end
 
-getobs(x::Any, i) = x[i]
+getobs(x, i) = x[i]
 getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
 getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
 
-restype(x::Any) = typeof(x)
+restype(x) = typeof(x)
 restype(x::Tuple) = Tuple{map(restype, x)...}
 restype(x::NamedTuple) = NamedTuple{keys(x), Tuple{map(restype, x)...}}
 restype(x::AbstractArray) = Array{eltype(x), ndims(x)}
@@ -193,7 +193,7 @@ end
     return (train, test), state + 1
 end
 
-function sample(rng::AbstractRNG, iter::Any, n::Integer)
+function sample(rng::AbstractRNG, iter, n::Integer)
     m = length(iter)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
     if n == m
@@ -309,7 +309,7 @@ function _val_split(T, prms, train, test, args)
     return loss
 end
 
-function validate(model::Any, data::AbstractResampler; args...)
+function validate(model, data::AbstractResampler; args...)
     @debug "Start model validation"
     loss = map(x -> _loss(_fit!(model, x[1], args), x[2]), data)
     @debug "Finished model validation"
