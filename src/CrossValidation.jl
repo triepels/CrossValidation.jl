@@ -12,7 +12,7 @@ export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining
        AbstractDistribution, Uniform, Normal, sample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
 
-nobs(x::Any) = 1
+nobs(x::Any) = length(x)
 nobs(x::AbstractArray) = size(x)[end]
 
 function nobs(x::Union{Tuple, NamedTuple})
@@ -43,13 +43,13 @@ struct FixedSplit{D} <: AbstractResampler
     m::Int
 end
 
-function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
+function FixedSplit(data, ratio::Number = 0.8)
     n = nobs(data)
     1 < n * ratio < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
     return FixedSplit(data, n, floor(Int, n * ratio))
 end
 
-function FixedSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
+function FixedSplit(data, m::Int)
     n = nobs(data)
     0 < m < n || throw(ArgumentError("data cannot be split by $m"))
     return FixedSplit(data, n, m)
@@ -71,13 +71,13 @@ struct RandomSplit{D} <: AbstractResampler
     perm::Vector{Int}
 end
 
-function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, ratio::Number = 0.8)
+function RandomSplit(data, ratio::Number = 0.8)
     n = nobs(data)
     1 < ratio * n < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
     return RandomSplit(data, n, floor(Int, ratio * n), shuffle!([OneTo(n);]))
 end
 
-function RandomSplit(data::Union{AbstractArray, Tuple, NamedTuple}, m::Int)
+function RandomSplit(data, m::Int)
     n = nobs(data)
     0 < m < n || throw(ArgumentError("data cannot be split by $m"))
     return RandomSplit(data, n, m, shuffle!([OneTo(n);]))
@@ -97,7 +97,7 @@ struct LeaveOneOut{D} <: AbstractResampler
     nobs::Int
 end
 
-function LeaveOneOut(data::Union{AbstractArray, Tuple, NamedTuple})
+function LeaveOneOut(data)
     n = nobs(data)
     n > 1 || throw(ArgumentError("data has too few observations to split"))
     return LeaveOneOut(data, n)
@@ -119,7 +119,7 @@ struct KFold{D} <: AbstractResampler
     perm::Vector{Int}
 end
 
-function KFold(data::Union{AbstractArray, Tuple, NamedTuple}; k::Int = 10)
+function KFold(data; k::Int = 10)
     n = nobs(data)
     1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
     return KFold(data, n, k, shuffle!([OneTo(n);]))
@@ -145,7 +145,7 @@ struct ForwardChaining{D} <: AbstractResampler
     partial::Bool
 end
 
-function ForwardChaining(data::Union{AbstractArray, Tuple, NamedTuple}, init::Int, out::Int; partial::Bool = true)
+function ForwardChaining(data, init::Int, out::Int; partial::Bool = true)
     n = nobs(data)
     1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
     1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
@@ -173,7 +173,7 @@ struct SlidingWindow{D} <: AbstractResampler
     partial::Bool
 end
 
-function SlidingWindow(data::Union{AbstractArray, Tuple, NamedTuple}, window::Int, out::Int; partial::Bool = true)
+function SlidingWindow(data, window::Int, out::Int; partial::Bool = true)
     n = nobs(data)
     1 ≤ window ≤ n || throw(ArgumentError("invalid sliding window of $window"))
     1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
