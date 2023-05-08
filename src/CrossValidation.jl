@@ -16,14 +16,12 @@ nobs(x::Any) = 1
 nobs(x::AbstractArray) = size(x)[end]
 
 function nobs(x::Union{Tuple, NamedTuple})
-    equalobs(x) || throw(ArgumentError("all data should have the same number of observations"))
-    return nobs(first(x))
-end
-
-function equalobs(x::Union{Tuple, NamedTuple})
-    length(x) > 0 || return false
+    length(x) > 0 || return 0
     n = nobs(first(x))
-    return all(y -> nobs(y) == n, Base.tail(x))
+    if !all(y -> nobs(y) == n, Base.tail(x))
+        throw(ArgumentError("all data should have the same number of observations"))
+    end
+    return n
 end
 
 getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
