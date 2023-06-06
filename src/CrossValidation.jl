@@ -332,7 +332,7 @@ function brute(T::Type, prms::ParameterVector, data::AbstractResampler, maximize
     loss = _val(T, prms, data, values(args))
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
-    return prms[ind], values(args)
+    return prms[ind]
 end
 
 brute(T::Type, space::FiniteSpace, data::AbstractResampler, maximize::Bool = true; args...) =
@@ -413,7 +413,7 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler, nstart::Int = 
     end
     @debug "Finished hill-climbing"
 
-    return parm, values(args)
+    return parm
 end
 
 abstract type AbstractBudget{names, T<:Tuple{Vararg{Number}}} end
@@ -501,8 +501,6 @@ function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     return k, args
 end
 
-_reduce_args(f, iter::Vector{NamedTuple{names, T}}) where {names, T} = NamedTuple{names, T}(reduce((x, y) -> f(values(x), values(y)), iter))
-
 function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
@@ -525,9 +523,7 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     end
     @debug "Finished successive halving"
 
-    argm = _reduce_args(.+, bracket[2])
-
-    return first(prms), argm
+    return first(prms)
 end
 
 sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
@@ -538,7 +534,6 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     parm = nothing
-    argm = nothing
     best = maximize ? -Inf : Inf
 
     train, test = first(data)
@@ -572,14 +567,12 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
             first(loss) < best || continue
         end
 
-        argm = _reduce_args(.+, bracket[2])
-
         parm = first(prms)
         best = first(loss)
     end
     @debug "Finished hyperband"
 
-    return parm, argm
+    return parm
 end
 
 function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Number, maximize::Bool = true; args...)
@@ -612,9 +605,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler, temp::Nu
     end
     @debug "Finished SASHA"
 
-    argm = map(x -> (n - 1) * x, values(args))
-
-    return first(prms), argm
+    return first(prms)
 end
 
 sasha(T::Type, space::FiniteSpace, data::AbstractResampler, temp::Number, maximize::Bool = true; args...) =

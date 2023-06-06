@@ -45,21 +45,21 @@ hyperband(MyModel, space, FixedSplit(x), HyperBudget(epochs = 81), 3, false)
 sasha(MyModel, space, FixedSplit(x), 1, false, epochs = 1)
 
 validate(KFold(x)) do train
-    prms, args = brute(MyModel, space, FixedSplit(train), false, epochs = 100)
-    return fit!(MyModel(prms...), train; args...)
+    prms = brute(MyModel, space, FixedSplit(train), false, epochs = 100)
+    return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms, args = hc(MyModel, space, FixedSplit(train), 1, 1, false, epochs = 100)
-    return fit!(MyModel(prms...), train; args...)
+    prms = hc(MyModel, space, FixedSplit(train), 1, 1, false, epochs = 100)
+    return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms, args = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs = 100), 2, false)
-    return fit!(MyModel(prms...), train; args...)
+    prms = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs = 100), 2, false)
+    return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms, args = sasha(MyModel, space, FixedSplit(train), 1, false, epochs = 1)
-    return fit!(MyModel(prms...), train; args...)
+    prms = sasha(MyModel, space, FixedSplit(train), 1, false, epochs = 1)
+    return fit!(MyModel(prms...), train, epochs = 10)
 end
