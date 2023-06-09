@@ -9,7 +9,7 @@ import Random: rand
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, FiniteSpace, InfiniteSpace, ParameterVector,
        AbstractBudget, AbstractRoundBudget, AbstractOverallBudget, schedule,
-       AbstractDistribution, Uniform, Normal, sample,
+       AbstractDistribution, Uniform, LogUniform, Normal, sample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
 
 nobs(x) = length(x)
@@ -265,6 +265,13 @@ struct Uniform{T<:AbstractFloat} <: AbstractDistribution
 end
 
 rand(rng::AbstractRNG, d::Uniform{T}) where T = d.a + (d.b - d.a) * rand(rng, T)
+
+struct LogUniform{T<:AbstractFloat} <: AbstractDistribution
+    a::T
+    b::T
+end
+
+rand(rng::AbstractRNG, d::LogUniform{T}) where T = exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, T))
 
 struct Normal{T<:AbstractFloat} <: AbstractDistribution
     mean::T
