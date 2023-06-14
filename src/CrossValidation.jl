@@ -7,9 +7,9 @@ using Distributed: @distributed, pmap
 import Random: rand
 
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
-       AbstractSpace, FiniteSpace, InfiniteSpace, ParameterVector,
+       AbstractSpace, FiniteSpace, InfiniteSpace, space, ParameterVector,
+       AbstractDistribution, DiscreteDistribution, ContinousDistribution, Uniform, LogUniform, Normal, sample,
        AbstractBudget, AbstractRoundBudget, AbstractOverallBudget, schedule,
-       AbstractDistribution, Uniform, LogUniform, Normal, sample,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
 
 nobs(x) = length(x)
@@ -213,14 +213,35 @@ end
 sample(iter, n) = sample(GLOBAL_RNG, iter, n)
 sample(iter) = sample(iter, 1)
 
+abstract type AbstractDistribution end
+abstract type DiscreteDistribution <: AbstractDistribution end
+abstract type ContinousDistribution <: AbstractDistribution end
+
+struct Uniform{T<:AbstractFloat} <: ContinousDistribution
+    a::T
+    b::T
+end
+
+rand(rng::AbstractRNG, d::Uniform{T}) where T = d.a + (d.b - d.a) * rand(rng, T)
+
+struct LogUniform{T<:AbstractFloat} <: ContinousDistribution
+    a::T
+    b::T
+end
+
+rand(rng::AbstractRNG, d::LogUniform{T}) where T = exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, T))
+
+struct Normal{T<:AbstractFloat} <: ContinousDistribution
+    mean::T
+    std::T
+end
+
+rand(rng::AbstractRNG, d::Normal{T}) where T = d.mean + d.std * randn(rng, T)
+
 abstract type AbstractSpace end
 
 struct FiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
-end
-
-function FiniteSpace(; vars...)
-    return FiniteSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
 end
 
 Base.eltype(::Type{FiniteSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
@@ -257,41 +278,19 @@ rand(rng::AbstractRNG, space::FiniteSpace{names}) where {names} = NamedTuple{nam
 sample(rng::AbstractRNG, space::FiniteSpace) = rand(rng, space)
 sample(rng::AbstractRNG, space::FiniteSpace, n::Int) = [space[i] for i in sample(rng, OneTo(length(space)), n)]
 
-abstract type AbstractDistribution end
-
-struct Uniform{T<:AbstractFloat} <: AbstractDistribution
-    a::T
-    b::T
-end
-
-rand(rng::AbstractRNG, d::Uniform{T}) where T = d.a + (d.b - d.a) * rand(rng, T)
-
-struct LogUniform{T<:AbstractFloat} <: AbstractDistribution
-    a::T
-    b::T
-end
-
-rand(rng::AbstractRNG, d::LogUniform{T}) where T = exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, T))
-
-struct Normal{T<:AbstractFloat} <: AbstractDistribution
-    mean::T
-    std::T
-end
-
-rand(rng::AbstractRNG, d::Normal{T}) where T = d.mean + d.std * randn(rng, T)
-
 struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
-end
-
-function InfiniteSpace(; vars...)
-    return InfiniteSpace{keys(vars), typeof(values(values(vars)))}(values(values(vars)))
 end
 
 rand(rng::AbstractRNG, space::InfiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
 
 sample(rng::AbstractRNG, space::InfiniteSpace) = rand(rng, space)
 sample(rng::AbstractRNG, space::InfiniteSpace, n::Int) = [sample(rng, space) for _ in OneTo(n)]
+
+space(; vars...) = space(keys(vars), values(values(vars)))
+space(names, vars::Tuple) = FiniteSpace{names, typeof(vars)}(vars)
+space(names, vars::Tuple{Vararg{DiscreteDistribution}}) = FiniteSpace{names, typeof(vars)}(vars)
+space(names, vars::Tuple{Vararg{AbstractDistribution}}) = InfiniteSpace{names, typeof(vars)}(vars)
 
 const ParameterVector = Array{NamedTuple{names, T}, 1} where {names, T}
 

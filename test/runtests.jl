@@ -31,35 +31,35 @@ x = rand(2, 100)
 
 validate(MyModel(2.0, 2.0), FixedSplit(x), epochs = 100)
 
-space = FiniteSpace(a = -8.0:1.0:8.0, b = -8.0:1.0:8.0)
+sp = space(a = -8.0:1.0:8.0, b = -8.0:1.0:8.0)
 
-brute(MyModel, space, FixedSplit(x), false, epochs = 100)
-brute(MyModel, sample(space, 64), FixedSplit(x), false, epochs = 100)
-hc(MyModel, space, FixedSplit(x), 1, 1, false, epochs = 100)
+brute(MyModel, sp, FixedSplit(x), false, epochs = 100)
+brute(MyModel, sample(sp, 64), FixedSplit(x), false, epochs = 100)
+hc(MyModel, sp, FixedSplit(x), 1, 1, false, epochs = 100)
 
-sha(MyModel, space, FixedSplit(x), ConstantBudget(epochs = 600), 2, false)
-sha(MyModel, sample(space, 64), FixedSplit(x), GeometricBudget(epochs = 448), 2, false)
+sha(MyModel, sp, FixedSplit(x), ConstantBudget(epochs = 600), 2, false)
+sha(MyModel, sample(sp, 64), FixedSplit(x), GeometricBudget(epochs = 448), 2, false)
 
-hyperband(MyModel, space, FixedSplit(x), HyperBudget(epochs = 81), 3, false)
+hyperband(MyModel, sp, FixedSplit(x), HyperBudget(epochs = 81), 3, false)
 
-sasha(MyModel, space, FixedSplit(x), 1, false, epochs = 1)
+sasha(MyModel, sp, FixedSplit(x), 1, false, epochs = 1)
 
 validate(KFold(x)) do train
-    prms = brute(MyModel, space, FixedSplit(train), false, epochs = 100)
+    prms = brute(MyModel, sp, FixedSplit(train), false, epochs = 100)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms = hc(MyModel, space, FixedSplit(train), 1, 1, false, epochs = 100)
+    prms = hc(MyModel, sp, FixedSplit(train), 1, 1, false, epochs = 100)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms = sha(MyModel, space, FixedSplit(train), ConstantBudget(epochs = 100), 2, false)
+    prms = sha(MyModel, sp, FixedSplit(train), ConstantBudget(epochs = 100), 2, false)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms = sasha(MyModel, space, FixedSplit(train), 1, false, epochs = 1)
+    prms = sasha(MyModel, sp, FixedSplit(train), 1, false, epochs = 1)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
