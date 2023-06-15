@@ -39,157 +39,138 @@ Base.eltype(r::AbstractResampler) = Tuple{restype(r.data), restype(r.data)}
 
 struct FixedSplit{D} <: AbstractResampler
     data::D
-    nobs::Int
     m::Int
+    function FixedSplit(data, m::Int)
+        n = nobs(data)
+        1 ≤ m < n || throw(ArgumentError("data cannot be split by $m"))
+        return new{typeof(data)}(data, m)
+    end
 end
 
-function FixedSplit(data, ratio::Number = 0.8)
-    n = nobs(data)
-    1 < n * ratio < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return FixedSplit(data, n, floor(Int, n * ratio))
-end
-
-function FixedSplit(data, m::Int)
-    n = nobs(data)
-    0 < m < n || throw(ArgumentError("data cannot be split by $m"))
-    return FixedSplit(data, n, m)
-end
+FixedSplit(data, ratio::Number = 0.8) = FixedSplit(data, floor(Int, nobs(data) * ratio))
 
 Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
     train = getobs(r.data, OneTo(r.m))
-    test = getobs(r.data, (r.m + 1):r.nobs)
+    test = getobs(r.data, (r.m + 1):nobs(r.data))
     return (train, test), state + 1
 end
 
 struct RandomSplit{D} <: AbstractResampler
     data::D
-    nobs::Int
     m::Int
     perm::Vector{Int}
+    function RandomSplit(data, m::Int)
+        n = nobs(data)
+        1 ≤ m < n || throw(ArgumentError("data cannot be split by $m"))
+        return new{typeof(data)}(data, m, shuffle!([OneTo(n);]))
+    end
 end
 
-function RandomSplit(data, ratio::Number = 0.8)
-    n = nobs(data)
-    1 < ratio * n < n || throw(ArgumentError("data cannot be split based on a $ratio ratio"))
-    return RandomSplit(data, n, floor(Int, ratio * n), shuffle!([OneTo(n);]))
-end
-
-function RandomSplit(data, m::Int)
-    n = nobs(data)
-    0 < m < n || throw(ArgumentError("data cannot be split by $m"))
-    return RandomSplit(data, n, m, shuffle!([OneTo(n);]))
-end
+RandomSplit(data, ratio::Number = 0.8) = RandomSplit(data, floor(Int, nobs(data) * ratio))
 
 Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > 1 && return nothing
     train = getobs(r.data, r.perm[OneTo(r.m)])
-    test = getobs(r.data, r.perm[(r.m + 1):r.nobs])
+    test = getobs(r.data, r.perm[(r.m + 1):nobs(r.data)])
     return (train, test), state + 1
 end
 
 struct LeaveOneOut{D} <: AbstractResampler
     data::D
-    nobs::Int
+    function LeaveOneOut(data)
+        n = nobs(data)
+        n > 1 || throw(ArgumentError("data has too few observations to split"))
+        return new{typeof(data)}(data)
+    end
 end
 
-function LeaveOneOut(data)
-    n = nobs(data)
-    n > 1 || throw(ArgumentError("data has too few observations to split"))
-    return LeaveOneOut(data, n)
-end
-
-Base.length(r::LeaveOneOut) = r.nobs
+Base.length(r::LeaveOneOut) = nobs(r.data)
 
 @propagate_inbounds function Base.iterate(r::LeaveOneOut, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.data, union(OneTo(state - 1), (state + 1):r.nobs))
+    train = getobs(r.data, union(OneTo(state - 1), (state + 1):nobs(r.data)))
     test = getobs(r.data, state:state)
     return (train, test), state + 1
 end
 
 struct KFold{D} <: AbstractResampler
     data::D
-    nobs::Int
     k::Int
     perm::Vector{Int}
-end
-
-function KFold(data; k::Int = 10)
-    n = nobs(data)
-    1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
-    return KFold(data, n, k, shuffle!([OneTo(n);]))
+    function KFold(data; k::Int = 10)
+        n = nobs(data)
+        1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
+        return new{typeof(data)}(data, k, shuffle!([OneTo(n);]))
+    end
 end
 
 Base.length(r::KFold) = r.k
 
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
     state > length(r) && return nothing
-    m = mod(r.nobs, r.k)
-    w = floor(Int, r.nobs / r.k)
+    n = nobs(r.data)
+    m = mod(n, r.k)
+    w = floor(Int, n / r.k)
     fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
-    train = getobs(r.data, r.perm[setdiff(OneTo(r.nobs), fold)])
+    train = getobs(r.data, r.perm[setdiff(OneTo(n), fold)])
     test = getobs(r.data, r.perm[fold])
     return (train, test), state + 1
 end
 
 struct ForwardChaining{D} <: AbstractResampler
     data::D
-    nobs::Int
     init::Int
     out::Int
     partial::Bool
-end
-
-function ForwardChaining(data, init::Int, out::Int; partial::Bool = true)
-    n = nobs(data)
-    1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
-    1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
-    init + out ≤ n || throw(ArgumentError("initial and out-of-sample window exceed the number of data observations"))
-    return ForwardChaining(data, n, init, out, partial)
+    function ForwardChaining(data, init::Int, out::Int; partial::Bool = true)
+        n = nobs(data)
+        1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
+        1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
+        init + out ≤ n || throw(ArgumentError("initial and out-of-sample window exceed the number of data observations"))
+        return new{typeof(data)}(data, init, out, partial)
+    end
 end
 
 function Base.length(r::ForwardChaining)
-    l = (r.nobs - r.init) / r.out
+    l = (nobs(r.data) - r.init) / r.out
     return r.partial ? ceil(Int, l) : floor(Int, l)
 end
 
 @propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
     state > length(r) && return nothing
     train = getobs(r.data, OneTo(r.init + (state - 1) * r.out))
-    test = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, r.nobs))
+    test = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, nobs(r.data)))
     return (train, test), state + 1
 end
 
 struct SlidingWindow{D} <: AbstractResampler
     data::D
-    nobs::Int
     window::Int
     out::Int
     partial::Bool
-end
-
-function SlidingWindow(data, window::Int, out::Int; partial::Bool = true)
-    n = nobs(data)
-    1 ≤ window ≤ n || throw(ArgumentError("invalid sliding window of $window"))
-    1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
-    window + out ≤ n || throw(ArgumentError("sliding and out-of-sample window exceed the number of data observations"))
-    return SlidingWindow(data, n, window, out, partial)
+    function SlidingWindow(data, window::Int, out::Int; partial::Bool = true)
+        n = nobs(data)
+        1 ≤ window ≤ n || throw(ArgumentError("invalid sliding window of $window"))
+        1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
+        window + out ≤ n || throw(ArgumentError("sliding and out-of-sample window exceed the number of data observations"))
+        return new{typeof(data)}(data, window, out, partial)
+    end
 end
 
 function Base.length(r::SlidingWindow)
-    l = (r.nobs - r.window) / r.out
+    l = (nobs(r.data) - r.window) / r.out
     return r.partial ? ceil(Int, l) : floor(Int, l)
 end
 
 @propagate_inbounds function Base.iterate(r::SlidingWindow, state = 1)
     state > length(r) && return nothing
     train = getobs(r.data, (1 + (state - 1) * r.out):(r.window + (state - 1) * r.out))
-    test = getobs(r.data, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, r.nobs))
+    test = getobs(r.data, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, nobs(r.data)))
     return (train, test), state + 1
 end
 
@@ -220,21 +201,39 @@ abstract type ContinousDistribution <: AbstractDistribution end
 struct Uniform{T<:AbstractFloat} <: ContinousDistribution
     a::T
     b::T
+    function Uniform(a::T, b::T) where T<:AbstractFloat
+        a < b || throw(ArgumentError("a must be smaller than b"))
+        return new{T}(a, b)
+    end
 end
+
+Uniform(a::AbstractFloat, b::AbstractFloat) = Uniform(promote(a, b)...)
 
 rand(rng::AbstractRNG, d::Uniform{T}) where T = d.a + (d.b - d.a) * rand(rng, T)
 
 struct LogUniform{T<:AbstractFloat} <: ContinousDistribution
     a::T
     b::T
+    function LogUniform(a::T, b::T) where T<:AbstractFloat
+        a < b || throw(ArgumentError("a must be smaller than b"))
+        return new{T}(a, b)
+    end
 end
+
+LogUniform(a::AbstractFloat, b::AbstractFloat) = LogUniform(promote(a, b)...)
 
 rand(rng::AbstractRNG, d::LogUniform{T}) where T = exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, T))
 
 struct Normal{T<:AbstractFloat} <: ContinousDistribution
     mean::T
     std::T
+    function Normal(mean::T, std::T) where T<:AbstractFloat
+        std > zero(std) || throw(ArgumentError("standard deviation must be larger than zero"))
+        return new{T}(mean, std)
+    end
 end
+
+Normal(mean::AbstractFloat, std::AbstractFloat) = Normal(promote(mean, std)...)
 
 rand(rng::AbstractRNG, d::Normal{T}) where T = d.mean + d.std * randn(rng, T)
 
