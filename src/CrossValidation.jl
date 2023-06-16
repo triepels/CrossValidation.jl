@@ -24,14 +24,13 @@ function nobs(x::Union{Tuple, NamedTuple})
     return n
 end
 
-getobs(x, i) = x[i]
 getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
 getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
 
-restype(x) = eltype(x)
 restype(x::Tuple) = Tuple{map(restype, x)...}
 restype(x::NamedTuple) = NamedTuple{keys(x), Tuple{map(restype, x)...}}
-restype(x::AbstractArray) = Array{eltype(x), ndims(x)}
+restype(x::AbstractRange) = Vector{eltype(x)}
+restype(x::AbstractArray) = typeof(x)
 
 abstract type AbstractResampler end
 
