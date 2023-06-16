@@ -24,7 +24,7 @@ function nobs(x::Union{Tuple, NamedTuple})
     return n
 end
 
-getobs(x::AbstractArray, i) = x[Base.setindex(map(Base.Slice, axes(x)), i, ndims(x))...]
+getobs(x::AbstractArray, i) = x[Base.setindex(ntuple(x -> Colon(), ndims(x)), i, ndims(x))...]
 getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
 
 restype(x::Tuple) = Tuple{map(restype, x)...}
