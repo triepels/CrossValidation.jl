@@ -38,7 +38,7 @@ julia> validate(MyModel(prms), KFold(data), args)
 
 Hyperparameter optimization using various optimizers:
 ```julia
-julia> sp = space(a = -6.0:0.5:6.0, b = -6.0:0.5:6.0)
+julia> sp = space(a = DiscreteUniform(-6.0:0.5:6.0), b = DiscreteUniform(-6.0:0.5:6.0))
 julia> sha(MyModel, sp, FixedSplit(data), GeometricBudget(args), 0.5, false)
 ```
 

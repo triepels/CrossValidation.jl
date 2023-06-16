@@ -8,7 +8,7 @@ import Random: rand
 
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, FiniteSpace, InfiniteSpace, space, ParameterVector,
-       AbstractDistribution, DiscreteDistribution, ContinousDistribution, Uniform, LogUniform, Normal, sample,
+       AbstractDistribution, DiscreteDistribution, ContinousDistribution, DiscreteUniform, Uniform, LogUniform, Normal, sample,
        AbstractBudget, AbstractRoundBudget, AbstractOverallBudget, schedule,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
 
@@ -198,6 +198,16 @@ abstract type AbstractDistribution end
 abstract type DiscreteDistribution <: AbstractDistribution end
 abstract type ContinousDistribution <: AbstractDistribution end
 
+struct DiscreteUniform{T} <: DiscreteDistribution
+    states::T
+end
+
+Base.eltype(::Type{DiscreteUniform{T}}) where T = eltype(T)
+Base.length(d::DiscreteUniform) = length(d.states)
+Base.getindex(d::DiscreteUniform, i::Int) = getindex(d.states, i)
+
+rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.states)
+
 struct Uniform{T<:AbstractFloat} <: ContinousDistribution
     a::T
     b::T
@@ -287,7 +297,6 @@ sample(rng::AbstractRNG, space::InfiniteSpace) = rand(rng, space)
 sample(rng::AbstractRNG, space::InfiniteSpace, n::Int) = [sample(rng, space) for _ in OneTo(n)]
 
 space(; vars...) = space(keys(vars), values(values(vars)))
-space(names, vars::Tuple) = FiniteSpace{names, typeof(vars)}(vars)
 space(names, vars::Tuple{Vararg{DiscreteDistribution}}) = FiniteSpace{names, typeof(vars)}(vars)
 space(names, vars::Tuple{Vararg{AbstractDistribution}}) = InfiniteSpace{names, typeof(vars)}(vars)
 

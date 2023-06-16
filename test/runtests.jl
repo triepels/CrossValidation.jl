@@ -31,7 +31,7 @@ x = rand(2, 100)
 
 validate(MyModel(2.0, 2.0), FixedSplit(x), epochs = 100)
 
-sp = space(a = -8.0:1.0:8.0, b = -8.0:1.0:8.0)
+sp = space(a = DiscreteUniform(-8.0:1.0:8.0), b = DiscreteUniform(-8.0:1.0:8.0))
 
 brute(MyModel, sp, FixedSplit(x), false, epochs = 100)
 brute(MyModel, sample(sp, 64), FixedSplit(x), false, epochs = 100)
