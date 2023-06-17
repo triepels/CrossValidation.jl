@@ -196,7 +196,7 @@ abstract type ContinousDistribution <: AbstractDistribution end
 
 Base.eltype(d::DiscreteDistribution) = eltype(states(d))
 Base.length(d::DiscreteDistribution) = length(states(d))
-Base.getindex(d::DiscreteDistribution, i::Int) = getindex(states(d), i)
+Base.getindex(d::DiscreteDistribution, i) = getindex(states(d), i)
 Base.iterate(d::DiscreteDistribution) = Base.iterate(states(d))
 Base.iterate(d::DiscreteDistribution, state) = Base.iterate(states(d), state)
 
