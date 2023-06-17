@@ -245,7 +245,9 @@ end
 Uniform(a::Number, b::Number) = Uniform{Float64}(a, b)
 
 rand(rng::AbstractRNG, d::Uniform{S, P}) where {S, P} = S(d.a + (d.b - d.a) * rand(rng, float(P)))
-rand(rng::AbstractRNG, d::Uniform{S, P}) where {S<:Integer, P} = round(S, d.a + (d.b - d.a) * rand(rng, float(P)))
+rand(rng::AbstractRNG, d::Uniform{S, P}) where {S<:Unsigned, P} = round(S, abs(d.a + (d.b - d.a) * rand(rng, float(P))))
+rand(rng::AbstractRNG, d::Uniform{S, P}) where {S<:Signed, P} = round(S, d.a + (d.b - d.a) * rand(rng, float(P)))
+rand(rng::AbstractRNG, d::Uniform{S, P}) where {S<:Bool, P} = S(d.a + (d.b - d.a) * rand(rng, float(P)) ≥ 0.5)
 
 struct LogUniform{S<:Number, P<:Number} <: ContinousDistribution
     a::P
@@ -260,7 +262,9 @@ end
 LogUniform(a::Number, b::Number) = LogUniform{Float64}(a, b)
 
 rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S, P} = S(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))))
-rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S<:Integer, P} = round(S, exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))))
+rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S<:Unsigned, P} = round(S, abs(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P)))))
+rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S<:Signed, P} = round(S, exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))))
+rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S<:Bool, P} = S(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))) ≥ 0.5)
 
 struct Normal{S<:Number, P<:Number} <: ContinousDistribution
     mean::P
@@ -275,7 +279,9 @@ end
 Normal(mean::Number, std::Number) = Normal{Float64}(mean, std)
 
 rand(rng::AbstractRNG, d::Normal{S, P}) where {S, P} = S(d.mean + d.std * randn(rng, float(P)))
-rand(rng::AbstractRNG, d::Normal{S, P}) where {S<:Integer, P} = round(S, d.mean + d.std * randn(rng, float(P)))
+rand(rng::AbstractRNG, d::Normal{S, P}) where {S<:Unsigned, P} = round(S, abs(d.mean + d.std * randn(rng, float(P))))
+rand(rng::AbstractRNG, d::Normal{S, P}) where {S<:Signed, P} = round(S, d.mean + d.std * randn(rng, float(P)))
+rand(rng::AbstractRNG, d::Normal{S, P}) where {S<:Bool, P} = S(d.mean + d.std * randn(rng, float(P)) ≥ 0.5)
 
 abstract type AbstractSpace end
 
