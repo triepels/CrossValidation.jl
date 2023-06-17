@@ -37,10 +37,10 @@ brute(MyModel, sp, FixedSplit(x), false, epochs = 100)
 brute(MyModel, sample(sp, 64), FixedSplit(x), false, epochs = 100)
 hc(MyModel, sp, FixedSplit(x), 1, 1, false, epochs = 100)
 
-sha(MyModel, sp, FixedSplit(x), ConstantBudget(epochs = 600), 2, false)
-sha(MyModel, sample(sp, 64), FixedSplit(x), GeometricBudget(epochs = 448), 2, false)
+sha(MyModel, sp, FixedSplit(x), Budget(epochs = 448), GeometricSchedule, 2, false)
+sha(MyModel, sample(sp, 64), FixedSplit(x), Budget(epochs = 600), ConstantSchedule, 2, false)
 
-hyperband(MyModel, sp, FixedSplit(x), HyperBudget(epochs = 81), 3, false)
+hyperband(MyModel, sp, FixedSplit(x), Budget(epochs = 81), 3, false)
 
 sasha(MyModel, sp, FixedSplit(x), 1, false, epochs = 1)
 
@@ -55,7 +55,7 @@ validate(KFold(x)) do train
 end
 
 validate(KFold(x)) do train
-    prms = sha(MyModel, sp, FixedSplit(train), ConstantBudget(epochs = 100), 2, false)
+    prms = sha(MyModel, sp, FixedSplit(train), Budget(epochs = 100), GeometricSchedule, 2, false)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
 

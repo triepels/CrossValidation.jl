@@ -6,11 +6,11 @@ using Distributed: @distributed, pmap
 
 import Random: rand
 
-export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
+export AbstractResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, FiniteSpace, InfiniteSpace, space, ParameterVector,
        AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal, sample,
-       AbstractBudget, AbstractRoundBudget, AbstractOverallBudget, schedule,
-       fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
+       Budget, ScheduleMode, GeometricSchedule, ConstantSchedule, HyperbandSchedule, schedule,
+       fit!, loss, validate, brute, hc, sha, hyperband, sasha
 
 nobs(x) = length(x)
 nobs(x::AbstractArray) = size(x)[end]
@@ -466,92 +466,72 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler, nstart::Int = 
     return parm
 end
 
-abstract type AbstractBudget{names, T<:Tuple{Vararg{Number}}} end
-abstract type AbstractHyperBudget{names, T<:Tuple{Number}} <: AbstractBudget{names, T} end
+struct Budget{names, T<:Tuple{Vararg{Real}}}
+    args::T
+    function Budget(; args...)
+        return new{keys(args), typeof(values(values(args)))}(values(values(args)))
+    end
+end
 
 _cast(T::Type{A}, x::Integer, r::RoundingMode) where A <: AbstractFloat = T(x)
 _cast(T::Type{A}, x::AbstractFloat, r::RoundingMode) where A <: Integer = round(T, x, r)
 _cast(T::Type{A}, x::Number, r::RoundingMode) where A <: Number = x
 
-struct GeometricBudget{names, T} <: AbstractBudget{names, T}
-    args::T
+struct ScheduleMode{T} end
+
+const GeometricSchedule = ScheduleMode{:Geometric}()
+const ConstantSchedule = ScheduleMode{:Constant}()
+const HyperbandSchedule = ScheduleMode{:Hyperband}()
+
+function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Geometric}, narms::Int, rate::Real) where {names, T}
+    nrounds = floor(Int, log(rate, narms)) + 1
+    return schedule(budget, mode, nrounds, narms, rate)
 end
 
-function GeometricBudget(; args...)
-    return GeometricBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
-end
-
-Base.values(budget::GeometricBudget) = budget.args
-
-function schedule(budget::GeometricBudget{names, T}, n, rate) where {names, T}
-    b = floor(Int, log(rate, n)) + 1
-    return schedule(budget, b, n, rate)
-end
-
-function schedule(budget::GeometricBudget{names, T}, b, n, rate) where {names, T}
-    k = Vector{Int}(undef, b)
-    args = Vector{NamedTuple{names, T}}(undef, b)
-    for i in OneTo(b)
-        c = ceil(Int, n / rate^(i - 1))
-        args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), x / (c * b), RoundDown), budget.args))
-        k[i] = ceil(Int, c / rate)
+function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Geometric}, nrounds::Int, narms::Int, rate::Real) where {names, T}
+    arms = Vector{Int}(undef, nrounds)
+    args = Vector{NamedTuple{names, T}}(undef, nrounds)
+    for i in OneTo(nrounds)
+        c = round(Int, narms / rate^(i - 1))
+        args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), x / (c * nrounds), RoundDown), budget.args))
+        arms[i] = round(Int, narms / rate^i, RoundNearestTiesUp)
     end
-    return k, args
+    return zip(arms, args)
 end
 
-struct ConstantBudget{names, T} <: AbstractBudget{names, T}
-    args::T
+function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Constant}, narms::Int, rate::Real) where {names, T}
+    nrounds = floor(Int, log(rate, narms)) + 1
+    return schedule(budget, mode, nrounds, narms, rate)
 end
 
-function ConstantBudget(; args...)
-    return ConstantBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
-end
-
-Base.values(budget::ConstantBudget) = budget.args
-
-function schedule(budget::ConstantBudget{names, T}, n, rate) where {names, T}
-    b = floor(Int, log(rate, n)) + 1
-    return schedule(budget, b, n, rate)
-end
-
-function schedule(budget::ConstantBudget{names, T}, b, n, rate) where {names, T}
-    k = Vector{Int}(undef, b)
-    args = Vector{NamedTuple{names, T}}(undef, b)
-    c = (rate - 1) * rate^(b - 1) / (n * (rate^b - 1))
-    for i in OneTo(b)
+function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Constant}, nrounds::Int, narms::Int, rate::Real) where {names, T}
+    arms = Vector{Int}(undef, nrounds)
+    args = Vector{NamedTuple{names, T}}(undef, nrounds)
+    c = (rate - 1) * rate^(nrounds - 1) / (narms * (rate^nrounds - 1))
+    for i in OneTo(nrounds)
         args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundDown), budget.args))
-        k[i] = ceil(Int, n / rate^i)
+        arms[i] = round(Int, narms / rate^i, RoundNearestTiesUp)
     end
-    return k, args
+    return zip(arms, args)
 end
 
-struct HyperBudget{names, T} <: AbstractHyperBudget{names, T}
-    args::T
+function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Hyperband}, narms::Int, rate::Real) where {names, T}
+    nrounds = floor(Int, log(rate, first(budget.args))) + 1
+    return schedule(budget, mode, nrounds, narms, rate)
 end
 
-function HyperBudget(; args...)
-    return HyperBudget{keys(args), typeof(values(values(args)))}(values(values(args)))
-end
-
-Base.values(budget::HyperBudget) = budget.args
-
-function schedule(budget::HyperBudget{names, T}, n, rate) where {names, T}
-    b = floor(Int, log(rate, first(budget.args))) + 1
-    return schedule(budget, b, n, rate)
-end
-
-function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
-    k = Vector{Int}(undef, b)
-    args = Vector{NamedTuple{names, T}}(undef, b)
-    for i in OneTo(b)
-        c = 1 / rate^(b - i)
-        args[i] = NamedTuple{names, T}(_cast(typeof(first(budget.args)), c * first(budget.args), RoundNearest)) #RoundDown?
-        k[i] = max(floor(Int, n / rate^i), 1)
+function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Hyperband}, nrounds::Int, narms::Int, rate::Real) where {names, T}
+    arms = Vector{Int}(undef, nrounds)
+    args = Vector{NamedTuple{names, T}}(undef, nrounds)
+    for i in OneTo(nrounds)
+        c = 1 / rate^(nrounds - i)
+        args[i] = NamedTuple{names, T}(_cast(typeof(first(budget.args)), c * first(budget.args), RoundNearest)) #RoundNearest?
+        arms[i] = max(floor(Int, narms / rate^i), 1)
     end
-    return k, args
+    return zip(arms, args)
 end
 
-function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true)
+function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Budget, mode::ScheduleMode = GeometricSchedule, rate::Number = 2, maximize::Bool = true)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
@@ -559,14 +539,12 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     train, test = first(data)
     arms = map(x -> T(; x...), prms)
 
-    bracket = schedule(budget, length(arms), rate)
-
     @debug "Start successive halving"
-    for (k, args) in zip(bracket...)
+    for (k, args) in schedule(budget, mode, length(arms), rate)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" prms args loss
-
+        
         inds = sortperm(loss, rev=maximize)
         arms = arms[inds[OneTo(k)]]
         prms = prms[inds[OneTo(k)]]
@@ -576,10 +554,10 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     return first(prms)
 end
 
-sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::AbstractBudget, rate::Number, maximize::Bool = true) =
-    sha(T, collect(space), data, budget, rate, maximize)
+sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::Budget, mode::ScheduleMode = GeometricSchedule, rate::Number = 2, maximize::Bool = true) =
+    sha(T, collect(space), data, budget, mode, rate, maximize)
 
-function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::AbstractHyperBudget, rate::Number, maximize::Bool = true)
+function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Budget, rate::Number = 3, maximize::Bool = true)
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
@@ -587,20 +565,18 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     best = maximize ? -Inf : Inf
 
     train, test = first(data)
-    m = floor(Int, log(rate, first(values(budget)))) + 1
+    n = floor(Int, log(rate, first(budget.args))) + 1
 
     @debug "Start hyperband"
-    for b in reverse(OneTo(m))
-        n = ceil(Int, m * rate^(b - 1) / b)
+    for i in reverse(OneTo(n))
+        narms = ceil(Int, n * rate^(i - 1) / i)
 
         loss = nothing
-        prms = sample(space, n)
+        prms = sample(space, narms)
         arms = map(x -> T(; x...), prms)
-        
-        bracket = schedule(budget, b, n, rate)
 
         @debug "Start successive halving"
-        for (k, args) in zip(bracket...)
+        for (k, args) in schedule(budget, HyperbandSchedule, i, narms, rate)
             arms = pmap(x -> _fit!(x, train, args), arms)
             loss = map(x -> _loss(x, test), arms)
             @debug "Validated arms" prms args loss
