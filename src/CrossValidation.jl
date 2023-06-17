@@ -8,7 +8,7 @@ import Random: rand
 
 export DataSampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, FiniteSpace, InfiniteSpace, space, ParameterVector,
-       AbstractDistribution, DiscreteDistribution, ContinousDistribution, DiscreteUniform, Uniform, LogUniform, Normal, sample,
+       AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal, sample,
        AbstractBudget, AbstractRoundBudget, AbstractOverallBudget, schedule,
        fit!, loss, validate, brute, hc, ConstantBudget, GeometricBudget, HyperBudget, sha, hyperband, sasha
 
@@ -176,9 +176,6 @@ end
 function sample(rng::AbstractRNG, iter, n::Integer)
     m = length(iter)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
-    if n == m
-        return shuffle!(collect(iter))
-    end
     vals = sizehint!(eltype(iter)[], n)
     for _ in OneTo(n)
         val = rand(rng, iter)
@@ -197,13 +194,41 @@ abstract type AbstractDistribution end
 abstract type DiscreteDistribution <: AbstractDistribution end
 abstract type ContinousDistribution <: AbstractDistribution end
 
-struct DiscreteUniform{T} <: DiscreteDistribution
-    states::T
+Base.eltype(d::DiscreteDistribution) = eltype(states(d))
+Base.length(d::DiscreteDistribution) = length(states(d))
+Base.getindex(d::DiscreteDistribution, i::Int) = getindex(states(d), i)
+Base.iterate(d::DiscreteDistribution) = Base.iterate(states(d))
+Base.iterate(d::DiscreteDistribution, state) = Base.iterate(states(d), state)
+
+struct Discrete{S, P<:AbstractFloat} <: DiscreteDistribution
+    states::S
+    probs::Vector{P}
+    function Discrete(states::S, probs::Vector{P}) where {S, P<:AbstractFloat}
+        length(states) == length(probs) || throw(ArgumentError("lenghts of states and probabilities do not match"))
+        (all(probs .≥ 0) && sum(probs) == 1) || throw(ArgumentError("invalid probabilities provided"))
+        return new{S, P}(states, probs)
+    end
 end
 
-Base.eltype(::Type{DiscreteUniform{T}}) where T = eltype(T)
-Base.length(d::DiscreteUniform) = length(d.states)
-Base.getindex(d::DiscreteUniform, i::Int) = getindex(d.states, i)
+states(d::Discrete) = d.states
+
+function rand(rng::AbstractRNG, d::Discrete)
+    c = 0.0
+    q = rand(rng)
+    for (state, p) in zip(d.states, d.probs)
+        c += p
+        if q < c
+            return state
+        end
+    end
+    throw(ErrorException("could not generate random element from distribution"))
+end
+
+struct DiscreteUniform{S} <: DiscreteDistribution
+    states::S
+end
+
+states(d::DiscreteUniform) = d.states
 
 rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.states)
 
