@@ -283,7 +283,7 @@ struct FiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
 end
 
-Base.eltype(::Type{FiniteSpace{names, T}}) where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
+Base.eltype(s::FiniteSpace{names, T}) where {names, T} = NamedTuple{names, Tuple{map(eltype, s.vars)...}}
 Base.length(s::FiniteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
 
 Base.keys(s::FiniteSpace) = OneTo(length(s))
