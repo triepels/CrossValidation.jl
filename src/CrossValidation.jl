@@ -232,50 +232,50 @@ states(d::DiscreteUniform) = d.states
 
 rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.states)
 
-struct Uniform{I<:Number, O<:Number} <: ContinousDistribution
-    a::I
-    b::I
-    function Uniform{O}(a::Number, b::Number) where O<:Number
+struct Uniform{S<:Number, P<:Number} <: ContinousDistribution
+    a::P
+    b::P
+    function Uniform{S}(a::Number, b::Number) where S<:Number
         a < b || throw(ArgumentError("a must be smaller than b"))
         a, b = promote(a, b)
-        return new{typeof(a), O}(a, b)
+        return new{S, typeof(a)}(a, b)
     end
 end
 
 Uniform(a::Number, b::Number) = Uniform{Float64}(a, b)
 
-rand(rng::AbstractRNG, d::Uniform{I, O}) where {I, O} = O(d.a + (d.b - d.a) * rand(rng, float(I)))
-rand(rng::AbstractRNG, d::Uniform{I, O}) where {I, O<:Integer} = round(O, d.a + (d.b - d.a) * rand(rng, float(I)))
+rand(rng::AbstractRNG, d::Uniform{S, P}) where {S, P} = S(d.a + (d.b - d.a) * rand(rng, float(P)))
+rand(rng::AbstractRNG, d::Uniform{S, P}) where {S<:Integer, P} = round(S, d.a + (d.b - d.a) * rand(rng, float(P)))
 
-struct LogUniform{I<:Number, O<:Number} <: ContinousDistribution
-    a::I
-    b::I
-    function LogUniform{O}(a::Number, b::Number) where O<:Number
+struct LogUniform{S<:Number, P<:Number} <: ContinousDistribution
+    a::P
+    b::P
+    function LogUniform{S}(a::Number, b::Number) where S<:Number
         a < b || throw(ArgumentError("a must be smaller than b"))
         a, b = promote(a, b)
-        return new{typeof(a), O}(a, b)
+        return new{S, typeof(a)}(a, b)
     end
 end
 
 LogUniform(a::Number, b::Number) = LogUniform{Float64}(a, b)
 
-rand(rng::AbstractRNG, d::LogUniform{I, O}) where {I, O} = O(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(I))))
-rand(rng::AbstractRNG, d::LogUniform{I, O}) where {I, O<:Integer} = round(O, exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(I))))
+rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S, P} = S(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))))
+rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S<:Integer, P} = round(S, exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))))
 
-struct Normal{I<:Number, O<:Number} <: ContinousDistribution
-    mean::I
-    std::I
-    function Normal{O}(mean::Number, std::Number) where O<:Number
+struct Normal{S<:Number, P<:Number} <: ContinousDistribution
+    mean::P
+    std::P
+    function Normal{S}(mean::Number, std::Number) where S<:Number
         std > zero(std) || throw(ArgumentError("standard deviation must be larger than zero"))
         mean, std = promote(mean, std)
-        return new{typeof(mean), O}(mean, std)
+        return new{S, typeof(mean)}(mean, std)
     end
 end
 
 Normal(mean::Number, std::Number) = Normal{Float64}(mean, std)
 
-rand(rng::AbstractRNG, d::Normal{I, O}) where {I, O} = O(d.mean + d.std * randn(rng, float(I)))
-rand(rng::AbstractRNG, d::Normal{I, O}) where {I, O<:Integer} = round(O, d.mean + d.std * randn(rng, float(I)))
+rand(rng::AbstractRNG, d::Normal{S, P}) where {S, P} = S(d.mean + d.std * randn(rng, float(P)))
+rand(rng::AbstractRNG, d::Normal{S, P}) where {S<:Integer, P} = round(S, d.mean + d.std * randn(rng, float(P)))
 
 abstract type AbstractSpace end
 
