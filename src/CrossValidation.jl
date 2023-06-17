@@ -544,7 +544,7 @@ function schedule(budget::HyperBudget{names, T}, b, n, rate) where {names, T}
     k = Vector{Int}(undef, b)
     args = Vector{NamedTuple{names, T}}(undef, b)
     for i in OneTo(b)
-        c = rate^(i - b)
+        c = 1 / rate^(b - i)
         args[i] = NamedTuple{names, T}(_cast(typeof(first(budget.args)), c * first(budget.args), RoundNearest)) #RoundDown?
         k[i] = max(floor(Int, n / rate^i), 1)
     end
@@ -559,7 +559,7 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Ab
     train, test = first(data)
     arms = map(x -> T(; x...), prms)
 
-    bracket = schedule(budget, length(arms), float(rate))
+    bracket = schedule(budget, length(arms), rate)
 
     @debug "Start successive halving"
     for (k, args) in zip(bracket...)
@@ -597,7 +597,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
         prms = sample(space, n)
         arms = map(x -> T(; x...), prms)
         
-        bracket = schedule(budget, b, n, float(rate))
+        bracket = schedule(budget, b, n, rate)
 
         @debug "Start successive halving"
         for (k, args) in zip(bracket...)
