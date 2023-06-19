@@ -491,8 +491,8 @@ function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Geometric}, nrou
     arms = Vector{Int}(undef, nrounds)
     args = Vector{NamedTuple{names, T}}(undef, nrounds)
     for i in OneTo(nrounds)
-        c = round(Int, narms / rate^(i - 1))
-        args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), x / (c * nrounds), RoundDown), budget.args))
+        c = 1 / (round(Int, narms / rate^(i - 1)) * nrounds)
+        args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundDown), budget.args))
         arms[i] = ceil(Int, narms / rate^i)
     end
     return zip(arms, args)
