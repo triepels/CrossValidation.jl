@@ -67,7 +67,7 @@ struct RandomSplit{D} <: AbstractResampler
     end
 end
 
-RandomSplit(data, ratio::Number = 0.8) = RandomSplit(data, floor(Int, nobs(data) * ratio))
+RandomSplit(data, ratio::Number) = RandomSplit(data, floor(Int, nobs(data) * ratio))
 
 Base.length(r::RandomSplit) = 1
 
@@ -100,7 +100,7 @@ struct KFold{D} <: AbstractResampler
     data::D
     k::Int
     perm::Vector{Int}
-    function KFold(data; k::Int = 10)
+    function KFold(data, k::Int)
         n = nobs(data)
         1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
         return new{typeof(data)}(data, k, shuffle!([OneTo(n);]))
