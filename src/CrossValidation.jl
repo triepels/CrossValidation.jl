@@ -194,14 +194,14 @@ abstract type AbstractDistribution end
 abstract type DiscreteDistribution <: AbstractDistribution end
 abstract type ContinousDistribution <: AbstractDistribution end
 
-Base.eltype(d::DiscreteDistribution) = eltype(states(d))
-Base.length(d::DiscreteDistribution) = length(states(d))
-Base.getindex(d::DiscreteDistribution, i) = getindex(states(d), i)
-Base.iterate(d::DiscreteDistribution) = Base.iterate(states(d))
-Base.iterate(d::DiscreteDistribution, state) = Base.iterate(states(d), state)
+Base.eltype(d::DiscreteDistribution) = eltype(values(d))
+Base.length(d::DiscreteDistribution) = length(values(d))
+Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
+Base.iterate(d::DiscreteDistribution) = Base.iterate(values(d))
+Base.iterate(d::DiscreteDistribution, state) = Base.iterate(values(d), state)
 
 struct Discrete{S, P<:AbstractFloat} <: DiscreteDistribution
-    states::S
+    vals::S
     probs::Vector{P}
     function Discrete(states::S, probs::Vector{P}) where {S, P<:AbstractFloat}
         length(states) == length(probs) || throw(ArgumentError("lenghts of states and probabilities do not match"))
@@ -210,7 +210,7 @@ struct Discrete{S, P<:AbstractFloat} <: DiscreteDistribution
     end
 end
 
-states(d::Discrete) = d.states
+Base.values(d::Discrete) = d.vals
 
 function rand(rng::AbstractRNG, d::Discrete)
     c = 0.0
@@ -225,12 +225,12 @@ function rand(rng::AbstractRNG, d::Discrete)
 end
 
 struct DiscreteUniform{S} <: DiscreteDistribution
-    states::S
+    vals::S
 end
 
-states(d::DiscreteUniform) = d.states
+Base.values(d::DiscreteUniform) = d.vals
 
-rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.states)
+rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.vals)
 
 struct Uniform{S<:Real, P<:Real} <: ContinousDistribution
     a::P
