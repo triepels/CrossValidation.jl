@@ -473,9 +473,9 @@ struct Budget{names, T<:Tuple{Vararg{Real}}}
     end
 end
 
-_cast(T::Type{A}, x::Integer, r::RoundingMode) where A <: AbstractFloat = T(x)
-_cast(T::Type{A}, x::AbstractFloat, r::RoundingMode) where A <: Integer = round(T, x, r)
-_cast(T::Type{A}, x::Number, r::RoundingMode) where A <: Number = x
+_cast(ref::Type{T}, x::Real, r) where T <: Real = T(x)
+_cast(ref::Type{T}, x::AbstractFloat, r) where T <: Integer = round(T, x, r)
+_cast(ref::Type{T}, x::T, r) where T <: Real = x
 
 struct ScheduleMode{T} end
 
