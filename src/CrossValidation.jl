@@ -554,7 +554,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     best = maximize ? -Inf : Inf
 
     train, test = first(data)
-    n = floor(Int, log(rate, first(budget.val))) + 1
+    n = floor(Int, log(rate, budget.val)) + 1
 
     @debug "Start hyperband"
     for i in reverse(OneTo(n))
