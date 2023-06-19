@@ -205,17 +205,17 @@ struct Discrete{S, P<:AbstractFloat} <: DiscreteDistribution
     probs::Vector{P}
     function Discrete(states::S, probs::Vector{P}) where {S, P<:AbstractFloat}
         length(states) == length(probs) || throw(ArgumentError("lenghts of states and probabilities do not match"))
-        (all(probs .≥ 0) && sum(probs) == 1) || throw(ArgumentError("invalid probabilities provided"))
+        (all(probs .≥ 0) && isapprox(sum(probs), 1)) || throw(ArgumentError("invalid probabilities provided"))
         return new{S, P}(states, probs)
     end
 end
 
 Base.values(d::Discrete) = d.vals
 
-function rand(rng::AbstractRNG, d::Discrete)
-    c = 0.0
+function rand(rng::AbstractRNG, d::Discrete{S, P}) where {S, P}
+    c = zero(P)
     q = rand(rng)
-    for (state, p) in zip(d.states, d.probs)
+    for (state, p) in zip(d.vals, d.probs)
         c += p
         if q < c
             return state
