@@ -494,7 +494,7 @@ function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Geometric}, nrou
     for i in OneTo(nrounds)
         c = round(Int, narms / rate^(i - 1))
         args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), x / (c * nrounds), RoundDown), budget.args))
-        arms[i] = round(Int, narms / rate^i, RoundNearestTiesUp)
+        arms[i] = ceil(Int, narms / rate^i)
     end
     return zip(arms, args)
 end
@@ -510,7 +510,7 @@ function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Constant}, nroun
     c = (rate - 1) * rate^(nrounds - 1) / (narms * (rate^nrounds - 1))
     for i in OneTo(nrounds)
         args[i] = NamedTuple{names, T}(map(x -> _cast(typeof(x), c * x, RoundDown), budget.args))
-        arms[i] = round(Int, narms / rate^i, RoundNearestTiesUp)
+        arms[i] = ceil(Int, narms / rate^i)
     end
     return zip(arms, args)
 end
