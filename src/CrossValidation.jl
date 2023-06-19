@@ -45,7 +45,7 @@ struct FixedSplit{D} <: AbstractResampler
     end
 end
 
-FixedSplit(data, ratio::Number) = FixedSplit(data, floor(Int, nobs(data) * ratio))
+FixedSplit(data, ratio::Real) = FixedSplit(data, floor(Int, nobs(data) * ratio))
 
 Base.length(r::FixedSplit) = 1
 
@@ -67,7 +67,7 @@ struct RandomSplit{D} <: AbstractResampler
     end
 end
 
-RandomSplit(data, ratio::Number) = RandomSplit(data, floor(Int, nobs(data) * ratio))
+RandomSplit(data, ratio::Real) = RandomSplit(data, floor(Int, nobs(data) * ratio))
 
 Base.length(r::RandomSplit) = 1
 
