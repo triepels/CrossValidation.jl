@@ -31,23 +31,22 @@ restype(x) = restype(typeof(x))
 restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
 restype(x::Type{T}) where T = T
 
-abstract type AbstractResampler end
+abstract type AbstractResampler{K} end
 
 Base.eltype(r::AbstractResampler) = Tuple{restype(r.data), restype(r.data)}
+Base.length(r::AbstractResampler{N}) where N = N
 
-struct FixedSplit{D} <: AbstractResampler
+struct FixedSplit{D, K} <: AbstractResampler{K}
     data::D
     m::Int
     function FixedSplit(data, m::Int)
         n = nobs(data)
         1 ≤ m < n || throw(ArgumentError("data cannot be split by $m"))
-        return new{typeof(data)}(data, m)
+        return new{typeof(data), 1}(data, m)
     end
 end
 
 FixedSplit(data, ratio::Real) = FixedSplit(data, floor(Int, nobs(data) * ratio))
-
-Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
@@ -56,20 +55,18 @@ Base.length(r::FixedSplit) = 1
     return (train, test), state + 1
 end
 
-struct RandomSplit{D} <: AbstractResampler
+struct RandomSplit{D, K} <: AbstractResampler{K}
     data::D
     m::Int
     perm::Vector{Int}
     function RandomSplit(data, m::Int)
         n = nobs(data)
         1 ≤ m < n || throw(ArgumentError("data cannot be split by $m"))
-        return new{typeof(data)}(data, m, shuffle!([OneTo(n);]))
+        return new{typeof(data), 1}(data, m, shuffle!([OneTo(n);]))
     end
 end
 
 RandomSplit(data, ratio::Real) = RandomSplit(data, floor(Int, nobs(data) * ratio))
-
-Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > 1 && return nothing
@@ -78,95 +75,80 @@ Base.length(r::RandomSplit) = 1
     return (train, test), state + 1
 end
 
-struct LeaveOneOut{D} <: AbstractResampler
+struct LeaveOneOut{D, K} <: AbstractResampler{K}
     data::D
     function LeaveOneOut(data)
         n = nobs(data)
         n > 1 || throw(ArgumentError("data has too few observations to split"))
-        return new{typeof(data)}(data)
+        return new{typeof(data), n}(data)
     end
 end
 
-Base.length(r::LeaveOneOut) = nobs(r.data)
-
-@propagate_inbounds function Base.iterate(r::LeaveOneOut, state = 1)
-    state > length(r) && return nothing
+@propagate_inbounds function Base.iterate(r::LeaveOneOut{D, K}, state = 1) where {D, K}
+    state > K && return nothing
     train = getobs(r.data, union(OneTo(state - 1), (state + 1):nobs(r.data)))
     test = getobs(r.data, state:state)
     return (train, test), state + 1
 end
 
-struct KFold{D} <: AbstractResampler
+struct KFold{D, K} <: AbstractResampler{K}
     data::D
-    k::Int
     perm::Vector{Int}
     function KFold(data, k::Int)
         n = nobs(data)
         1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
-        return new{typeof(data)}(data, k, shuffle!([OneTo(n);]))
+        return new{typeof(data), k}(data, shuffle!([OneTo(n);]))
     end
 end
 
-Base.length(r::KFold) = r.k
-
-@propagate_inbounds function Base.iterate(r::KFold, state = 1)
-    state > length(r) && return nothing
+@propagate_inbounds function Base.iterate(r::KFold{D, K}, state = 1) where {D, K}
+    state > K && return nothing
     n = nobs(r.data)
-    m = mod(n, r.k)
-    w = floor(Int, n / r.k)
+    m = mod(n, K)
+    w = floor(Int, n / K)
     fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
     train = getobs(r.data, r.perm[setdiff(OneTo(n), fold)])
     test = getobs(r.data, r.perm[fold])
     return (train, test), state + 1
 end
 
-struct ForwardChaining{D} <: AbstractResampler
+struct ForwardChaining{D, K} <: AbstractResampler{K}
     data::D
     init::Int
     out::Int
-    partial::Bool
     function ForwardChaining(data, init::Int, out::Int; partial::Bool = true)
         n = nobs(data)
         1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
         1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
         init + out ≤ n || throw(ArgumentError("initial and out-of-sample window exceed the number of data observations"))
-        return new{typeof(data)}(data, init, out, partial)
+        K = partial ? ceil(Int, (n - init) / out) : floor(Int, (n - init) / out)
+        return new{typeof(data), K}(data, init, out)
     end
 end
 
-function Base.length(r::ForwardChaining)
-    l = (nobs(r.data) - r.init) / r.out
-    return r.partial ? ceil(Int, l) : floor(Int, l)
-end
-
-@propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
-    state > length(r) && return nothing
+@propagate_inbounds function Base.iterate(r::ForwardChaining{D, K}, state = 1) where {D, K}
+    state > K && return nothing
     train = getobs(r.data, OneTo(r.init + (state - 1) * r.out))
     test = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, nobs(r.data)))
     return (train, test), state + 1
 end
 
-struct SlidingWindow{D} <: AbstractResampler
+struct SlidingWindow{D, K} <: AbstractResampler{K}
     data::D
     window::Int
     out::Int
-    partial::Bool
     function SlidingWindow(data, window::Int, out::Int; partial::Bool = true)
         n = nobs(data)
         1 ≤ window ≤ n || throw(ArgumentError("invalid sliding window of $window"))
         1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
         window + out ≤ n || throw(ArgumentError("sliding and out-of-sample window exceed the number of data observations"))
-        return new{typeof(data)}(data, window, out, partial)
+        K = partial ? ceil(Int, (n - window) / out) : floor(Int, (n - window) / out)
+        return new{typeof(data), K}(data, window, out)
     end
 end
 
-function Base.length(r::SlidingWindow)
-    l = (nobs(r.data) - r.window) / r.out
-    return r.partial ? ceil(Int, l) : floor(Int, l)
-end
-
-@propagate_inbounds function Base.iterate(r::SlidingWindow, state = 1)
-    state > length(r) && return nothing
+@propagate_inbounds function Base.iterate(r::SlidingWindow{D, K}, state = 1) where {D, K}
+    state > K && return nothing
     train = getobs(r.data, (1 + (state - 1) * r.out):(r.window + (state - 1) * r.out))
     test = getobs(r.data, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, nobs(r.data)))
     return (train, test), state + 1
@@ -520,9 +502,8 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nro
     return zip(arms, args)
 end
 
-function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false)
+function sha(T::Type, prms::ParameterVector, data::AbstractResampler{1}, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     train, test = first(data)
@@ -543,11 +524,10 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Bu
     return first(prms)
 end
 
-sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+sha(T::Type, space::FiniteSpace, data::AbstractResampler{1}, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     sha(T, collect(space), data, budget, mode = mode, rate = rate, maximize = maximize)
 
-function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Budget; rate::Number = 3, maximize::Bool = false)
-    length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
+function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler{1}, budget::Budget; rate::Number = 3, maximize::Bool = false)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     parm = nothing
@@ -590,9 +570,8 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     return parm
 end
 
-function sasha(T::Type, prms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false)
+function sasha(T::Type, prms::ParameterVector, data::AbstractResampler{1}; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
     train, test = first(data)
@@ -623,7 +602,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler; args::Na
     return first(prms)
 end
 
-sasha(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
+sasha(T::Type, space::FiniteSpace, data::AbstractResampler{1}; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
     sasha(T, collect(space), data, args = args, temp = temp, maximize = maximize)
 
 end
