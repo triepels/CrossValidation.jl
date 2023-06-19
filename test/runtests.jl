@@ -33,33 +33,33 @@ validate(MyModel(2.0, 2.0), FixedSplit(x), epochs = 100)
 
 sp = space(a = DiscreteUniform(-8.0:1.0:8.0), b = DiscreteUniform(-8.0:1.0:8.0))
 
-brute(MyModel, sp, FixedSplit(x), false, epochs = 100)
-brute(MyModel, sample(sp, 64), FixedSplit(x), false, epochs = 100)
-hc(MyModel, sp, FixedSplit(x), 1, 1, false, epochs = 100)
+brute(MyModel, sp, FixedSplit(x), args = (epochs = 100,), maximize = false)
+brute(MyModel, sample(sp, 64), FixedSplit(x), args = (epochs = 100,), maximize = false)
+hc(MyModel, sp, FixedSplit(x), args = (epochs = 100,), nstart = 10, k = 1, maximize = false)
 
-sha(MyModel, sp, FixedSplit(x), Budget(epochs = 448), GeometricSchedule, 2, false)
-sha(MyModel, sample(sp, 64), FixedSplit(x), Budget(epochs = 600), ConstantSchedule, 2, false)
+sha(MyModel, sp, FixedSplit(x), Budget(epochs = 448), mode = GeometricSchedule, rate = 2, maximize = false)
+sha(MyModel, sample(sp, 64), FixedSplit(x), Budget(epochs = 600), mode = ConstantSchedule, rate = 2, maximize = false)
 
-hyperband(MyModel, sp, FixedSplit(x), Budget(epochs = 81), 3, false)
+hyperband(MyModel, sp, FixedSplit(x), Budget(epochs = 81), rate = 3, maximize = false)
 
-sasha(MyModel, sp, FixedSplit(x), 1, false, epochs = 1)
+sasha(MyModel, sp, FixedSplit(x), args = (epochs = 1,), temp = 1, maximize = false)
 
 validate(KFold(x)) do train
-    prms = brute(MyModel, sp, FixedSplit(train), false, epochs = 100)
+    prms = brute(MyModel, sp, FixedSplit(train), args = (epochs = 100,), maximize = false)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms = hc(MyModel, sp, FixedSplit(train), 1, 1, false, epochs = 100)
+    prms = hc(MyModel, sp, FixedSplit(train), args = (epochs = 100,), nstart = 10, k = 1, maximize = false)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms = sha(MyModel, sp, FixedSplit(train), Budget(epochs = 100), GeometricSchedule, 2, false)
+    prms = sha(MyModel, sp, FixedSplit(train), Budget(epochs = 100), mode = GeometricSchedule, rate = 2, maximize = false)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
-    prms = sasha(MyModel, sp, FixedSplit(train), 1, false, epochs = 1)
+    prms = sasha(MyModel, sp, FixedSplit(train), args = (epochs = 1,), temp = 1, maximize = false)
     return fit!(MyModel(prms...), train, epochs = 10)
 end
