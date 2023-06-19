@@ -5,9 +5,8 @@ import CrossValidation: fit!, loss
 struct MyModel
     a::Float64
     b::Float64
+    MyModel(; a::Float64, b::Float64) = new(a, b)
 end
-
-MyModel(; a::Float64, b::Float64) = MyModel(a, b)
 
 function fit!(model::MyModel, x::AbstractArray; epochs::Int = 1)
     #println("Fitting $model ..."); sleep(0.1)
@@ -29,7 +28,7 @@ collect(SlidingWindow(1:10, 4, 2))
 
 x = rand(2, 100)
 
-validate(MyModel(2.0, 2.0), FixedSplit(x), epochs = 100)
+validate(MyModel(a = 2.0, b = 2.0), FixedSplit(x), epochs = 100)
 
 sp = space(a = DiscreteUniform(-8.0:1.0:8.0), b = DiscreteUniform(-8.0:1.0:8.0))
 
@@ -46,20 +45,20 @@ sasha(MyModel, sp, FixedSplit(x), args = (epochs = 1,), temp = 1, maximize = fal
 
 validate(KFold(x)) do train
     prms = brute(MyModel, sp, FixedSplit(train), args = (epochs = 100,), maximize = false)
-    return fit!(MyModel(prms...), train, epochs = 10)
+    return fit!(MyModel(; prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
     prms = hc(MyModel, sp, FixedSplit(train), args = (epochs = 100,), nstart = 10, k = 1, maximize = false)
-    return fit!(MyModel(prms...), train, epochs = 10)
+    return fit!(MyModel(; prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
     prms = sha(MyModel, sp, FixedSplit(train), Budget(epochs = 100), mode = GeometricSchedule, rate = 2, maximize = false)
-    return fit!(MyModel(prms...), train, epochs = 10)
+    return fit!(MyModel(; prms...), train, epochs = 10)
 end
 
 validate(KFold(x)) do train
     prms = sasha(MyModel, sp, FixedSplit(train), args = (epochs = 1,), temp = 1, maximize = false)
-    return fit!(MyModel(prms...), train, epochs = 10)
+    return fit!(MyModel(; prms...), train, epochs = 10)
 end
