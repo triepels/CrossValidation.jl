@@ -376,7 +376,7 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(T::Type, prms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = true)
+function brute(T::Type, prms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
     loss = _val(T, prms, data, args)
@@ -385,7 +385,7 @@ function brute(T::Type, prms::ParameterVector, data::AbstractResampler; args::Na
     return prms[ind]
 end
 
-brute(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = true) =
+brute(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false) =
     brute(T, collect(space), data, args = args, maximize = maximize)
 
 function _neighbors(space, ref, k, bl)
@@ -433,7 +433,7 @@ function _neighbors(space, ref, k, bl)
     return inds
 end
 
-function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), nstart::Int = 1, k::Int = 1, maximize::Bool = true)
+function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
 
@@ -531,7 +531,7 @@ function schedule(budget::Budget{names, T}, mode::ScheduleMode{:Hyperband}, nrou
     return zip(arms, args)
 end
 
-function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Budget; mode::ScheduleMode = GeometricSchedule, rate::Number = 2, maximize::Bool = true)
+function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Budget; mode::ScheduleMode = GeometricSchedule, rate::Number = 2, maximize::Bool = false)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
@@ -554,10 +554,10 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Bu
     return first(prms)
 end
 
-sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::Budget; mode::ScheduleMode = GeometricSchedule, rate::Number = 2, maximize::Bool = true) =
+sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::Budget; mode::ScheduleMode = GeometricSchedule, rate::Number = 2, maximize::Bool = false) =
     sha(T, collect(space), data, budget, mode = mode, rate = rate, maximize = maximize)
 
-function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Budget; rate::Number = 3, maximize::Bool = true)
+function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Budget; rate::Number = 3, maximize::Bool = false)
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
@@ -601,7 +601,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     return parm
 end
 
-function sasha(T::Type, prms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = true)
+function sasha(T::Type, prms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
@@ -634,7 +634,7 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler; args::Na
     return first(prms)
 end
 
-sasha(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = true) =
+sasha(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
     sasha(T, collect(space), data, args = args, temp = temp, maximize = maximize)
 
 end
