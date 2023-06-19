@@ -530,7 +530,7 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nro
     return zip(arms, args)
 end
 
-function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricSchedule, rate::Number = 2, maximize::Bool = false)
+function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Number = 2, maximize::Bool = false)
     length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
@@ -553,7 +553,7 @@ function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Bu
     return first(prms)
 end
 
-sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricSchedule, rate::Number = 2, maximize::Bool = false) =
+sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Number = 2, maximize::Bool = false) =
     sha(T, collect(space), data, budget, mode = mode, rate = rate, maximize = maximize)
 
 function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Budget; rate::Number = 3, maximize::Bool = false)
