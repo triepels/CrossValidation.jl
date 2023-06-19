@@ -28,7 +28,7 @@ collect(SlidingWindow(1:10, 4, 2))
 
 x = rand(2, 100)
 
-validate(MyModel(a = 2.0, b = 2.0), FixedSplit(x), epochs = 100)
+validate(MyModel(a = 2.0, b = 2.0), FixedSplit(x), args=(epochs = 100,))
 
 sp = space(a = DiscreteUniform(-8.0:1.0:8.0), b = DiscreteUniform(-8.0:1.0:8.0))
 

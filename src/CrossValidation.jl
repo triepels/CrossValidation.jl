@@ -358,7 +358,7 @@ function _val_split(T, prms, train, test, args)
     return loss
 end
 
-function validate(model, data::AbstractResampler; args...)
+function validate(model, data::AbstractResampler; args::NamedTuple = ())
     @debug "Start model validation"
     loss = map(x -> _loss(_fit!(model, x[1], args), x[2]), data)
     @debug "Finished model validation"
