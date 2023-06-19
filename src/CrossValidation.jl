@@ -482,7 +482,7 @@ const GeometricAllocation = AllocationMode{:Geometric}()
 const ConstantAllocation = AllocationMode{:Constant}()
 const HyperbandAllocation = AllocationMode{:Hyperband}()
 
-function allocate(budget::Budget, mode::AllocationMode{:Geometric}, narms::Int, rate::Real)
+function allocate(budget::Budget, mode::AllocationMode, narms::Int, rate::Real)
     nrounds = floor(Int, log(rate, narms)) + 1
     return allocate(budget, mode, nrounds, narms, rate)
 end
@@ -498,11 +498,6 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Geometric}, nro
     return zip(arms, args)
 end
 
-function allocate(budget::Budget, mode::AllocationMode{:Constant}, narms::Int, rate::Real)
-    nrounds = floor(Int, log(rate, narms)) + 1
-    return allocate(budget, mode, nrounds, narms, rate)
-end
-
 function allocate(budget::Budget{name, T}, mode::AllocationMode{:Constant}, nrounds::Int, narms::Int, rate::Real) where {name, T}
     arms = Vector{Int}(undef, nrounds)
     args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
@@ -512,11 +507,6 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Constant}, nrou
         arms[i] = ceil(Int, narms / rate^i)
     end
     return zip(arms, args)
-end
-
-function allocate(budget::Budget, mode::AllocationMode{:Hyperband}, narms::Int, rate::Real)
-    nrounds = floor(Int, log(rate, budget.val)) + 1
-    return allocate(budget, mode, nrounds, narms, rate)
 end
 
 function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nrounds::Int, narms::Int, rate::Real) where {name, T}
