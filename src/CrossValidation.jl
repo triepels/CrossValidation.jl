@@ -2,7 +2,7 @@ module CrossValidation
 
 using Base: @propagate_inbounds, OneTo
 using Random: GLOBAL_RNG, AbstractRNG, shuffle!
-using Distributed: @distributed, pmap
+using Distributed: pmap
 
 import Random: rand
 
