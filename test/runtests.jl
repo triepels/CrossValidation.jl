@@ -37,10 +37,10 @@ brute(MyModel, sp, data, args = (epochs = 100,), maximize = false)
 brute(MyModel, sample(sp, 64), data, args = (epochs = 100,), maximize = false)
 hc(MyModel, sp, data, args = (epochs = 100,), nstart = 10, k = 1, maximize = false)
 
-sha(MyModel, sp, data, Budget(epochs = 448), mode = GeometricAllocation, rate = 2, maximize = false)
-sha(MyModel, sample(sp, 64), data, Budget(epochs = 600), mode = ConstantAllocation, rate = 2, maximize = false)
+sha(MyModel, sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
+sha(MyModel, sample(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
 
-hyperband(MyModel, sp, data, Budget(epochs = 81), rate = 3, maximize = false)
+hyperband(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
 
 sasha(MyModel, sp, data, args = (epochs = 1,), temp = 1, maximize = false)
 
@@ -55,7 +55,7 @@ validate(KFold(x, 10)) do train
 end
 
 validate(KFold(x, 10)) do train
-    prms = sha(MyModel, sp, FixedSplit(train, 0.8), Budget(epochs = 100), mode = GeometricAllocation, rate = 2, maximize = false)
+    prms = sha(MyModel, sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
     return fit!(MyModel(; prms...), train, epochs = 10)
 end
 
