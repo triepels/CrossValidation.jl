@@ -337,13 +337,13 @@ space(names, vars::Tuple{Vararg{AbstractDistribution}}) = InfiniteSpace{names, t
 
 const ParameterVector = Array{NamedTuple{names, T}, 1} where {names, T}
 
-_fit!(model, x::AbstractArray, args) = fit!(model, x; args...)
 _fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
+_fit!(model, x, args) = fit!(model, x; args...)
 
 fit!(model, x) = throw(MethodError(fit!, (model, x)))
 
-_loss(model, x::AbstractArray) = loss(model, x)
 _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
+_loss(model, x) = loss(model, x)
 
 loss(model, x) = throw(MethodError(loss, (model, x)))
 
@@ -365,8 +365,8 @@ function validate(model, data::AbstractResampler; args::NamedTuple = ())
     return loss
 end
 
-_f(f, x::AbstractArray) = f(x)
 _f(f, x::Union{Tuple, NamedTuple}) = f(x...)
+_f(f, x) = f(x)
 
 function validate(f::Function, data::AbstractResampler)
     @debug "Start model validation"
