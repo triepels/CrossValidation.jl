@@ -12,8 +12,8 @@ export AbstractResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardCh
        Budget, AllocationMode, GeometricAllocation, ConstantAllocation, HyperbandAllocation, allocate,
        fit!, loss, validate, brute, hc, sha, hyperband, sasha
 
-nobs(x) = length(x)
 nobs(x::AbstractArray) = size(x)[end]
+nobs(x) = length(x)
 
 function nobs(x::Union{Tuple, NamedTuple})
     length(x) > 0 || return 0
@@ -24,8 +24,8 @@ function nobs(x::Union{Tuple, NamedTuple})
     return n
 end
 
-getobs(x::AbstractArray, i) = x[Base.setindex(ntuple(x -> Colon(), ndims(x)), i, ndims(x))...]
 getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
+getobs(x::AbstractArray, i) = x[Base.setindex(ntuple(x -> Colon(), ndims(x)), i, ndims(x))...]
 
 restype(x) = restype(typeof(x))
 restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
