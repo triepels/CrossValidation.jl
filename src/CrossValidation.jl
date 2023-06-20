@@ -25,7 +25,7 @@ function nobs(x::Union{Tuple, NamedTuple})
 end
 
 getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
-getobs(x::AbstractArray, i) = x[Base.setindex(ntuple(x -> Colon(), ndims(x)), i, ndims(x))...]
+getobs(x, i) = x[Base.setindex(ntuple(x -> Colon(), ndims(x)), i, ndims(x))...]
 
 restype(x) = restype(typeof(x))
 restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
