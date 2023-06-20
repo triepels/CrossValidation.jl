@@ -196,8 +196,8 @@ abstract type ContinousDistribution <: AbstractDistribution end
 Base.eltype(d::DiscreteDistribution) = eltype(values(d))
 Base.length(d::DiscreteDistribution) = length(values(d))
 Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
-Base.iterate(d::DiscreteDistribution) = Base.iterate(values(d))
-Base.iterate(d::DiscreteDistribution, state) = Base.iterate(values(d), state)
+Base.iterate(d::DiscreteDistribution) = iterate(values(d))
+Base.iterate(d::DiscreteDistribution, state) = iterate(values(d), state)
 
 struct Discrete{S, P<:AbstractFloat} <: DiscreteDistribution
     vals::S
