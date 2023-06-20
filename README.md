@@ -3,7 +3,7 @@ Provides simple and lightweight implementations of model validation and hyperpar
 
 # Installation
 Run the following code to install the package:
-```julia
+```
 ] add https://github.com/triepels/CrossValidation.jl
 ```
 
