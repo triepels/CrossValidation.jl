@@ -45,21 +45,21 @@ hyperband(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
 sasha(MyModel, sp, data, args = (epochs = 1,), temp = 1, maximize = false)
 
 validate(KFold(x, 10)) do train
-    prms = brute(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), maximize = false)
-    return fit!(MyModel(; prms...), train, epochs = 10)
+    parms = brute(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), maximize = false)
+    return fit!(MyModel(; parms...), train, epochs = 10)
 end
 
 validate(KFold(x, 10)) do train
-    prms = hc(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), nstart = 10, k = 1, maximize = false)
-    return fit!(MyModel(; prms...), train, epochs = 10)
+    parms = hc(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), nstart = 10, k = 1, maximize = false)
+    return fit!(MyModel(; parms...), train, epochs = 10)
 end
 
 validate(KFold(x, 10)) do train
-    prms = sha(MyModel, sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
-    return fit!(MyModel(; prms...), train, epochs = 10)
+    parms = sha(MyModel, sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
+    return fit!(MyModel(; parms...), train, epochs = 10)
 end
 
 validate(KFold(x, 10)) do train
-    prms = sasha(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
-    return fit!(MyModel(; prms...), train, epochs = 10)
+    parms = sasha(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
+    return fit!(MyModel(; parms...), train, epochs = 10)
 end

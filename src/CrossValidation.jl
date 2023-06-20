@@ -347,14 +347,14 @@ _loss(model, x::Union{Tuple, NamedTuple}) = loss(model, x...)
 
 loss(model, x) = throw(MethodError(loss, (model, x)))
 
-@inline function _val(T, prms, data, args)
-    return sum(x -> _val_split(T, prms, x..., args), data) / length(data)
+@inline function _val(T, parms, data, args)
+    return sum(x -> _val_split(T, parms, x..., args), data) / length(data)
 end
 
-function _val_split(T, prms, train, test, args)
-    models = pmap(x -> _fit!(T(; x...), train, args), prms)
+function _val_split(T, parms, train, test, args)
+    models = pmap(x -> _fit!(T(; x...), train, args), parms)
     loss = map(x -> _loss(x, test), models)
-    @debug "Validated models" prms args loss
+    @debug "Validated models" parms args loss
     return loss
 end
 
@@ -375,13 +375,13 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(T::Type, prms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false)
-    length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function brute(T::Type, parms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false)
+    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     @debug "Start brute-force search"
-    loss = _val(T, prms, data, args)
+    loss = _val(T, parms, data, args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
-    return prms[ind]
+    return parms[ind]
 end
 
 brute(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false) =
@@ -520,27 +520,27 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nro
     return zip(arms, args)
 end
 
-function sha(T::Type, prms::ParameterVector, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false)
-    length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function sha(T::Type, parms::ParameterVector, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false)
+    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     train, test = first(data)
-    arms = map(x -> T(; x...), prms)
+    arms = map(x -> T(; x...), parms)
 
     @debug "Start successive halving"
     for (k, args) in allocate(budget, mode, length(arms), rate)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
-        @debug "Validated arms" prms args loss
+        @debug "Validated arms" parms args loss
         
         inds = sortperm(loss, rev=maximize)
         arms = arms[inds[OneTo(k)]]
-        prms = prms[inds[OneTo(k)]]
+        parms = parms[inds[OneTo(k)]]
     end
     @debug "Finished successive halving"
 
-    return first(prms)
+    return first(parms)
 end
 
 sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
@@ -561,18 +561,18 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
         narms = ceil(Int, n * rate^(i - 1) / i)
 
         loss = nothing
-        prms = sample(space, narms)
-        arms = map(x -> T(; x...), prms)
+        parms = sample(space, narms)
+        arms = map(x -> T(; x...), parms)
 
         @debug "Start successive halving"
         for (k, args) in allocate(budget, HyperbandAllocation, i, narms, rate)
             arms = pmap(x -> _fit!(x, train, args), arms)
             loss = map(x -> _loss(x, test), arms)
-            @debug "Validated arms" prms args loss
+            @debug "Validated arms" parms args loss
     
             inds = sortperm(loss, rev=maximize)
             arms = arms[inds[OneTo(k)]]
-            prms = prms[inds[OneTo(k)]]    
+            parms = parms[inds[OneTo(k)]]    
         end
         @debug "Finished successive halving"
 
@@ -582,7 +582,7 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
             first(loss) < best || continue
         end
 
-        parm = first(prms)
+        parm = first(parms)
         best = first(loss)
     end
     @debug "Finished hyperband"
@@ -590,13 +590,13 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     return parm
 end
 
-function sasha(T::Type, prms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false)
-    length(prms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function sasha(T::Type, parms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false)
+    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
     train, test = first(data)
-    arms = map(x -> T(; x...), prms)
+    arms = map(x -> T(; x...), parms)
 
     n = 1
     @debug "Start SASHA"
@@ -610,17 +610,17 @@ function sasha(T::Type, prms::ParameterVector, data::AbstractResampler; args::Na
             prob = exp.(-n .* (loss .- min(loss...)) ./ temp)
         end        
 
-        @debug "Validated arms" prms prob loss
+        @debug "Validated arms" parms prob loss
 
         inds = findall(rand(length(prob)) .≤ prob)
         arms = arms[inds]
-        prms = prms[inds]
+        parms = parms[inds]
 
         n += 1
     end
     @debug "Finished SASHA"
 
-    return first(prms)
+    return first(parms)
 end
 
 sasha(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
