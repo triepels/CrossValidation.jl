@@ -351,7 +351,7 @@ loss(model, x) = throw(MethodError(loss, (model, x)))
     return sum(x -> _val_split(T, parms, x..., args), data) / length(data)
 end
 
-function _val_split(T, parms, train, test, args)
+@inline function _val_split(T, parms, train, test, args)
     models = pmap(x -> _fit!(T(; x...), train, args), parms)
     loss = map(x -> _loss(x, test), models)
     @debug "Validated models" parms args loss
