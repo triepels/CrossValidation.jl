@@ -530,10 +530,8 @@ function sha(T::Type, parms::ParameterVector, data::AbstractResampler, budget::B
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
         @debug "Validated arms" parms args loss
-        
-        inds = sortperm(loss, rev=maximize)
-        arms = arms[inds[OneTo(k)]]
-        parms = parms[inds[OneTo(k)]]
+        inds = sortperm(loss, rev=maximize)[OneTo(k)]
+        arms, parms = arms[inds], parms[inds]
     end
     @debug "Finished successive halving"
 
@@ -566,10 +564,8 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
             arms = pmap(x -> _fit!(x, train, args), arms)
             loss = map(x -> _loss(x, test), arms)
             @debug "Validated arms" parms args loss
-    
-            inds = sortperm(loss, rev=maximize)
-            arms = arms[inds[OneTo(k)]]
-            parms = parms[inds[OneTo(k)]]    
+            inds = sortperm(loss, rev=maximize)[OneTo(k)]
+            arms, parms = arms[inds], parms[inds]
         end
         @debug "Finished successive halving"
 
