@@ -53,9 +53,9 @@ Base.length(r::FixedSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
     state > 1 && return nothing
-    train = getobs(r.data, OneTo(r.m))
-    test = getobs(r.data, (r.m + 1):nobs(r.data))
-    return (train, test), state + 1
+    x = getobs(r.data, OneTo(r.m))
+    y = getobs(r.data, (r.m + 1):nobs(r.data))
+    return (x, y), state + 1
 end
 
 struct RandomSplit{D} <: BinaryResampler
@@ -75,9 +75,9 @@ Base.length(r::RandomSplit) = 1
 
 @propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
     state > 1 && return nothing
-    train = getobs(r.data, r.perm[OneTo(r.m)])
-    test = getobs(r.data, r.perm[(r.m + 1):nobs(r.data)])
-    return (train, test), state + 1
+    x = getobs(r.data, r.perm[OneTo(r.m)])
+    y = getobs(r.data, r.perm[(r.m + 1):nobs(r.data)])
+    return (x, y), state + 1
 end
 
 struct LeaveOneOut{D} <: AbstractResampler
@@ -93,9 +93,9 @@ Base.length(r::LeaveOneOut) = nobs(r.data)
 
 @propagate_inbounds function Base.iterate(r::LeaveOneOut, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.data, union(OneTo(state - 1), (state + 1):nobs(r.data)))
-    test = getobs(r.data, state:state)
-    return (train, test), state + 1
+    x = getobs(r.data, union(OneTo(state - 1), (state + 1):nobs(r.data)))
+    y = getobs(r.data, state:state)
+    return (x, y), state + 1
 end
 
 struct KFold{D} <: AbstractResampler
@@ -114,12 +114,11 @@ Base.length(r::KFold) = r.k
 @propagate_inbounds function Base.iterate(r::KFold, state = 1)
     state > length(r) && return nothing
     n = nobs(r.data)
-    m = mod(n, r.k)
-    w = floor(Int, n / r.k)
+    m, w = mod(n, r.k), floor(Int, n / r.k)
     fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
-    train = getobs(r.data, r.perm[setdiff(OneTo(n), fold)])
-    test = getobs(r.data, r.perm[fold])
-    return (train, test), state + 1
+    x = getobs(r.data, r.perm[setdiff(OneTo(n), fold)])
+    y = getobs(r.data, r.perm[fold])
+    return (x, y), state + 1
 end
 
 struct ForwardChaining{D} <: AbstractResampler
@@ -143,9 +142,9 @@ end
 
 @propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.data, OneTo(r.init + (state - 1) * r.out))
-    test = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, nobs(r.data)))
-    return (train, test), state + 1
+    x = getobs(r.data, OneTo(r.init + (state - 1) * r.out))
+    y = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, nobs(r.data)))
+    return (x, y), state + 1
 end
 
 struct SlidingWindow{D} <: AbstractResampler
@@ -169,9 +168,9 @@ end
 
 @propagate_inbounds function Base.iterate(r::SlidingWindow, state = 1)
     state > length(r) && return nothing
-    train = getobs(r.data, (1 + (state - 1) * r.out):(r.window + (state - 1) * r.out))
-    test = getobs(r.data, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, nobs(r.data)))
-    return (train, test), state + 1
+    x = getobs(r.data, (1 + (state - 1) * r.out):(r.window + (state - 1) * r.out))
+    y = getobs(r.data, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, nobs(r.data)))
+    return (x, y), state + 1
 end
 
 function sample(rng::AbstractRNG, iter, n::Integer)
@@ -523,13 +522,13 @@ function sha(T::Type, parms::ParameterVector, data::BinaryResampler, budget::Bud
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
-    train, test = first(data)
+    train, val = first(data)
     arms = map(x -> T(; x...), parms)
 
     @debug "Start successive halving"
     for (k, args) in allocate(budget, mode, length(arms), rate)
         arms = pmap(x -> _fit!(x, train, args), arms)
-        loss = map(x -> _loss(x, test), arms)
+        loss = map(x -> _loss(x, val), arms)
         @debug "Validated arms" parms args loss
         inds = sortperm(loss, rev=maximize)[OneTo(k)]
         arms, parms = arms[inds], parms[inds]
@@ -548,7 +547,7 @@ function hyperband(T::Type, space::AbstractSpace, data::BinaryResampler, budget:
     parm = nothing
     best = maximize ? -Inf : Inf
 
-    train, test = first(data)
+    train, val = first(data)
     n = floor(Int, log(rate, budget.val)) + 1
 
     @debug "Start hyperband"
@@ -562,7 +561,7 @@ function hyperband(T::Type, space::AbstractSpace, data::BinaryResampler, budget:
         @debug "Start successive halving"
         for (k, args) in allocate(budget, HyperbandAllocation, i, narms, rate)
             arms = pmap(x -> _fit!(x, train, args), arms)
-            loss = map(x -> _loss(x, test), arms)
+            loss = map(x -> _loss(x, val), arms)
             @debug "Validated arms" parms args loss
             inds = sortperm(loss, rev=maximize)[OneTo(k)]
             arms, parms = arms[inds], parms[inds]
