@@ -33,9 +33,11 @@ restype(x::Type{T}) where T = T
 
 abstract type AbstractResampler end
 
+abstract type BinaryResampler <: AbstractResampler end
+
 Base.eltype(r::AbstractResampler) = Tuple{restype(r.data), restype(r.data)}
 
-struct FixedSplit{D} <: AbstractResampler
+struct FixedSplit{D} <: BinaryResampler
     data::D
     m::Int
     function FixedSplit(data, m::Int)
@@ -56,7 +58,7 @@ Base.length(r::FixedSplit) = 1
     return (train, test), state + 1
 end
 
-struct RandomSplit{D} <: AbstractResampler
+struct RandomSplit{D} <: BinaryResampler
     data::D
     m::Int
     perm::Vector{Int}
@@ -517,9 +519,8 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nro
     return zip(arms, args)
 end
 
-function sha(T::Type, parms::ParameterVector, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false)
+function sha(T::Type, parms::ParameterVector, data::BinaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     train, test = first(data)
@@ -538,11 +539,10 @@ function sha(T::Type, parms::ParameterVector, data::AbstractResampler, budget::B
     return first(parms)
 end
 
-sha(T::Type, space::FiniteSpace, data::AbstractResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+sha(T::Type, space::FiniteSpace, data::BinaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     sha(T, collect(space), data, budget, mode = mode, rate = rate, maximize = maximize)
 
-function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budget::Budget; rate::Real = 3, maximize::Bool = false)
-    length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
+function hyperband(T::Type, space::AbstractSpace, data::BinaryResampler, budget::Budget; rate::Real = 3, maximize::Bool = false)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     parm = nothing
@@ -583,9 +583,8 @@ function hyperband(T::Type, space::AbstractSpace, data::AbstractResampler, budge
     return parm
 end
 
-function sasha(T::Type, parms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false)
+function sasha(T::Type, parms::ParameterVector, data::BinaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    length(data) == 1 || throw(ArgumentError("can only optimize over one resample fold"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
     train, test = first(data)
@@ -616,7 +615,7 @@ function sasha(T::Type, parms::ParameterVector, data::AbstractResampler; args::N
     return first(parms)
 end
 
-sasha(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
+sasha(T::Type, space::FiniteSpace, data::BinaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
     sasha(T, collect(space), data, args = args, temp = temp, maximize = maximize)
 
 end
