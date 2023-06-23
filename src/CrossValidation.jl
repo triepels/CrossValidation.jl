@@ -365,12 +365,9 @@ function validate(model, data::AbstractResampler; args::NamedTuple = ())
     return loss
 end
 
-_f(f, x::Union{Tuple, NamedTuple}) = f(x...)
-_f(f, x) = f(x)
-
 function validate(f::Function, data::AbstractResampler)
     @debug "Start model validation"
-    loss = map(x -> _loss(_f(f, x[1]), x[2]), data)
+    loss = map(x -> _loss(f(x[1]), x[2]), data)
     @debug "Finished model validation"
     return loss
 end
