@@ -605,8 +605,7 @@ function sasha(T::Type, parms::ParameterVector, data::BinaryResampler; args::Nam
         @debug "Validated arms" parms prob loss
 
         inds = findall(rand(length(prob)) .≤ prob)
-        arms = arms[inds]
-        parms = parms[inds]
+        arms, parms = arms[inds], parms[inds]
 
         n += 1
     end
