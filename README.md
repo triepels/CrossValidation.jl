@@ -45,8 +45,8 @@ julia> sha(MyModel, sp, FixedSplit(data, 0.8), Budget{:arg}(100))
 Model validation with hyperparameter optimization:
 ```julia
 julia> validate(KFold(data, 10)) do train
-           parms = brute(MyModel, sp, FixedSplit(train, 0.8))
-           return fit!(MyModel(; parms...), train)
+           parm = brute(MyModel, sp, FixedSplit(train, 0.8))
+           return fit!(MyModel(; parm...), train)
        end
 ```
 
