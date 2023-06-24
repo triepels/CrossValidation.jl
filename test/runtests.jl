@@ -73,3 +73,19 @@ validate(KFold(x, 10)) do train
     parm = sasha(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
     return fit!(MyModel(; parm...), train, epochs = 10)
 end
+
+validate(KFold(x, 10)) do train
+    return brute_fit(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), maximize = false)
+end
+
+validate(KFold(x, 10)) do train
+    return hc_fit(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), nstart = 10, k = 1, maximize = false)
+end
+
+validate(KFold(x, 10)) do train
+    return sha_fit(MyModel, sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
+end
+
+validate(KFold(x, 10)) do train
+    return sasha_fit(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
+end
