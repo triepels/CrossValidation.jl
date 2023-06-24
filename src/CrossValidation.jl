@@ -407,7 +407,7 @@ function brute_fit(T::Type, parms::ParameterVector, data::UnaryResampler; args::
     return models[ind]
 end
 
-brute_fit(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false) =
+brute_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args::NamedTuple = (), maximize::Bool = false) =
     brute_fit(T, collect(space), data, args = args, maximize = maximize)
 
 function _neighbors(space, ref, k, bl)
