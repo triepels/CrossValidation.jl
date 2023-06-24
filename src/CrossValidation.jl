@@ -327,6 +327,8 @@ struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
 end
 
+Base.eltype(s::InfiniteSpace{names, T}) where {names, T} = NamedTuple{names, Tuple{map(eltype, s.vars)...}}
+
 rand(rng::AbstractRNG, space::InfiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
 
 sample(rng::AbstractRNG, space::InfiniteSpace) = rand(rng, space)
