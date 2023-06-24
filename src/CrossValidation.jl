@@ -6,11 +6,11 @@ using Distributed: pmap
 
 import Random: rand
 
-export AbstractResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
+export AbstractResampler, UnaryResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, FiniteSpace, InfiniteSpace, space, ParameterVector,
        AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal, sample,
        Budget, AllocationMode, GeometricAllocation, ConstantAllocation, HyperbandAllocation, allocate,
-       fit!, loss, validate, brute, hc, sha, hyperband, sasha
+       fit!, loss, validate, brute, brute_fit, hc, hc_fit, sha, sha_fit, hyperband, hyperband_fit, sasha, sasha_fit
 
 nobs(x::AbstractArray) = size(x)[end]
 nobs(x) = length(x)
@@ -33,11 +33,11 @@ restype(x::Type{T}) where T = T
 
 abstract type AbstractResampler end
 
-abstract type BinaryResampler <: AbstractResampler end
+abstract type UnaryResampler <: AbstractResampler end
 
 Base.eltype(r::AbstractResampler) = Tuple{restype(r.data), restype(r.data)}
 
-struct FixedSplit{D} <: BinaryResampler
+struct FixedSplit{D} <: UnaryResampler
     data::D
     m::Int
     function FixedSplit(data, m::Int)
@@ -58,7 +58,7 @@ Base.length(r::FixedSplit) = 1
     return (x, y), state + 1
 end
 
-struct RandomSplit{D} <: BinaryResampler
+struct RandomSplit{D} <: UnaryResampler
     data::D
     m::Int
     perm::Vector{Int}
@@ -355,8 +355,15 @@ end
 @inline function _val_split(T, parms, train, test, args)
     models = pmap(x -> _fit!(T(; x...), train, args), parms)
     loss = map(x -> _loss(x, test), models)
-    @debug "Validated models" parms args loss
+    @debug "Fitted models" parms args loss
     return loss
+end
+
+@inline function _fit_models(T, parms, train, test, args)
+    models = pmap(x -> _fit!(T(; x...), train, args), parms)
+    loss = map(x -> _loss(x, test), models)
+    @debug "Fitted models" parms args loss
+    return models, loss
 end
 
 function validate(model, data::AbstractResampler; args::NamedTuple = ())
@@ -375,15 +382,33 @@ end
 
 function brute(T::Type, parms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    
     @debug "Start brute-force search"
     loss = _val(T, parms, data, args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
+    
     return parms[ind]
 end
 
 brute(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false) =
     brute(T, collect(space), data, args = args, maximize = maximize)
+
+function brute_fit(T::Type, parms::ParameterVector, data::UnaryResampler; args::NamedTuple = (), maximize::Bool = false)
+    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    
+    train, val = first(data)
+
+    @debug "Start brute-force search"
+    models, loss = _fit_models(T, parms, train, val, args)
+    ind = maximize ? argmax(loss) : argmin(loss)
+    @debug "Finished brute-force search"
+    
+    return models[ind]
+end
+
+brute_fit(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false) =
+    brute_fit(T, collect(space), data, args = args, maximize = maximize)
 
 function _neighbors(space, ref, k, bl)
     dim = size(space)
@@ -444,7 +469,9 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTup
     while !isempty(cand)
         append!(bl, cand)
 
-        loss = _val(T, space[cand], data, args)
+        parms = space[cand]
+        loss = _val(T, parms, data, args)
+
         if maximize
             i = argmax(loss)
             loss[i] > best || break
@@ -453,14 +480,47 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTup
             loss[i] < best || break
         end
 
-        parm = space[cand[i]]
-        best = loss[i]
+        parm, best = parms[i], loss[i]
 
         cand = _neighbors(space, cand[i], k, bl)
     end
     @debug "Finished hill-climbing"
 
     return parm
+end
+
+function hc_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args::NamedTuple = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+    k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
+
+    bl = Int[]
+    model = nothing
+    best = maximize ? -Inf : Inf
+
+    train, val = first(data)
+    cand = sample(OneTo(length(space)), nstart)
+
+    @debug "Start hill-climbing"
+    while !isempty(cand)
+        append!(bl, cand)
+
+        models, loss = _fit_models(T, space[cand], train, val, args)
+
+        if maximize
+            i = argmax(loss)
+            loss[i] > best || break
+        else
+            i = argmin(loss)
+            loss[i] < best || break
+        end
+
+        model, best = models[i], loss[i]
+
+        cand = _neighbors(space, cand[i], k, bl)
+    end
+    @debug "Finished hill-climbing"
+
+    return model
 end
 
 struct Budget{name, T<:Real}
@@ -518,7 +578,7 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nro
     return zip(arms, args)
 end
 
-function sha(T::Type, parms::ParameterVector, data::BinaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false)
+@inline function _sha(T, parms, data, budget, mode, rate, maximize)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
@@ -529,22 +589,29 @@ function sha(T::Type, parms::ParameterVector, data::BinaryResampler, budget::Bud
     for (k, args) in allocate(budget, mode, length(arms), rate)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, val), arms)
-        @debug "Validated arms" parms args loss
+        @debug "Fitted arms" parms args loss
         inds = sortperm(loss, rev=maximize)[OneTo(k)]
         arms, parms = arms[inds], parms[inds]
     end
     @debug "Finished successive halving"
 
-    return first(parms)
+    return first(arms), first(parms)
 end
 
-sha(T::Type, space::FiniteSpace, data::BinaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+sha(T::Type, parms::ParameterVector, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+    _sha(T, parms, data, budget, mode, rate, maximize)[2]
+sha(T::Type, space::FiniteSpace, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     sha(T, collect(space), data, budget, mode = mode, rate = rate, maximize = maximize)
 
-function hyperband(T::Type, space::AbstractSpace, data::BinaryResampler, budget::Budget; rate::Real = 3, maximize::Bool = false)
+sha_fit(T::Type, parms::ParameterVector, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+    _sha(T, parms, data, budget, mode, rate, maximize)[1]
+sha_fit(T::Type, space::FiniteSpace, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+    sha_fit(T, collect(space), data, budget, mode = mode, rate = rate, maximize = maximize)
+
+@inline function _hyperband(T, space, data, budget, rate, maximize)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
-    parm = nothing
+    arm, parm = nothing, nothing
     best = maximize ? -Inf : Inf
 
     train, val = first(data)
@@ -562,7 +629,7 @@ function hyperband(T::Type, space::AbstractSpace, data::BinaryResampler, budget:
         for (k, args) in allocate(budget, HyperbandAllocation, i, narms, rate)
             arms = pmap(x -> _fit!(x, train, args), arms)
             loss = map(x -> _loss(x, val), arms)
-            @debug "Validated arms" parms args loss
+            @debug "Fitted arms" parms args loss
             inds = sortperm(loss, rev=maximize)[OneTo(k)]
             arms, parms = arms[inds], parms[inds]
         end
@@ -574,15 +641,20 @@ function hyperband(T::Type, space::AbstractSpace, data::BinaryResampler, budget:
             first(loss) < best || continue
         end
 
-        parm = first(parms)
+        arm, parm = first(arms), first(parms)
         best = first(loss)
     end
     @debug "Finished hyperband"
 
-    return parm
+    return arm, parm
 end
 
-function sasha(T::Type, parms::ParameterVector, data::BinaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false)
+hyperband(T::Type, space::AbstractSpace, data::UnaryResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+    _hyperband(T, space, data, budget, rate, maximize)[2]
+hyperband_fit(T::Type, space::AbstractSpace, data::UnaryResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+    _hyperband(T, space, data, budget, rate, maximize)[1]
+ 
+@inline function _sasha(T, parms, data, args, temp, maximize)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
@@ -601,7 +673,7 @@ function sasha(T::Type, parms::ParameterVector, data::BinaryResampler; args::Nam
             prob = exp.(-n .* (loss .- min(loss...)) ./ temp)
         end        
 
-        @debug "Validated arms" parms prob loss
+        @debug "Fitted arms" parms prob loss
 
         inds = findall(rand(length(prob)) .≤ prob)
         arms, parms = arms[inds], parms[inds]
@@ -610,10 +682,17 @@ function sasha(T::Type, parms::ParameterVector, data::BinaryResampler; args::Nam
     end
     @debug "Finished SASHA"
 
-    return first(parms)
+    return first(arms), first(parms)
 end
 
-sasha(T::Type, space::FiniteSpace, data::BinaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
+sasha(T::Type, parms::ParameterVector, data::UnaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
+    _sasha(T, parms, data, args, temp, maximize)[2]
+sasha(T::Type, space::FiniteSpace, data::UnaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
     sasha(T, collect(space), data, args = args, temp = temp, maximize = maximize)
+
+sasha_fit(T::Type, parms::ParameterVector, data::UnaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
+    _sasha(T, parms, data, args, temp, maximize)[1]
+sasha_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
+    sasha_fit(T, collect(space), data, args = args, temp = temp, maximize = maximize)
 
 end
