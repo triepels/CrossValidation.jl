@@ -31,10 +31,12 @@ restype(x) = restype(typeof(x))
 restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
 restype(x::Type{T}) where T = T
 
-abstract type AbstractResampler{D} end
-abstract type UnaryResampler{D} <: AbstractResampler{D} end
+abstract type AbstractResampler end
+abstract type UnaryResampler{D} <: AbstractResampler end
+abstract type PolyadicResampler{D} <: AbstractResampler end
 
-Base.eltype(::Type{R}) where R<:AbstractResampler{D} where D = Tuple{restype(D), restype(D)}
+Base.eltype(::Type{R}) where R<:UnaryResampler{D} where D = Tuple{restype(D), restype(D)}
+Base.eltype(::Type{R}) where R<:PolyadicResampler{D} where D = Tuple{restype(D), restype(D)}
 
 struct FixedSplit{D} <: UnaryResampler{D}
     data::D
@@ -79,7 +81,7 @@ Base.length(r::RandomSplit) = 1
     return (x, y), state + 1
 end
 
-struct LeaveOneOut{D} <: AbstractResampler{D}
+struct LeaveOneOut{D} <: PolyadicResampler{D}
     data::D
     function LeaveOneOut(data)
         n = nobs(data)
@@ -97,7 +99,7 @@ Base.length(r::LeaveOneOut) = nobs(r.data)
     return (x, y), state + 1
 end
 
-struct KFold{D} <: AbstractResampler{D}
+struct KFold{D} <: PolyadicResampler{D}
     data::D
     k::Int
     perm::Vector{Int}
@@ -120,7 +122,7 @@ Base.length(r::KFold) = r.k
     return (x, y), state + 1
 end
 
-struct ForwardChaining{D} <: AbstractResampler{D}
+struct ForwardChaining{D} <: PolyadicResampler{D}
     data::D
     init::Int
     out::Int
@@ -146,7 +148,7 @@ end
     return (x, y), state + 1
 end
 
-struct SlidingWindow{D} <: AbstractResampler{D}
+struct SlidingWindow{D} <: PolyadicResampler{D}
     data::D
     window::Int
     out::Int
