@@ -385,7 +385,7 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(T::Type, parms::ParameterVector, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false)
+function brute(T::Type, parms, data::AbstractResampler; args = (), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     @debug "Start brute-force search"
@@ -396,10 +396,7 @@ function brute(T::Type, parms::ParameterVector, data::AbstractResampler; args::N
     return parms[ind]
 end
 
-brute(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), maximize::Bool = false) =
-    brute(T, collect(space), data, args = args, maximize = maximize)
-
-function brute_fit(T::Type, parms::ParameterVector, data::UnaryResampler; args::NamedTuple = (), maximize::Bool = false)
+function brute_fit(T::Type, parms, data::UnaryResampler; args = (), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     train, val = first(data)
@@ -411,9 +408,6 @@ function brute_fit(T::Type, parms::ParameterVector, data::UnaryResampler; args::
     
     return models[ind]
 end
-
-brute_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args::NamedTuple = (), maximize::Bool = false) =
-    brute_fit(T, collect(space), data, args = args, maximize = maximize)
 
 function _neighbors(space, ref, k, bl)
     dim = size(space)
@@ -460,7 +454,7 @@ function _neighbors(space, ref, k, bl)
     return inds
 end
 
-function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTuple = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
+function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
 
@@ -494,7 +488,7 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args::NamedTup
     return parm
 end
 
-function hc_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args::NamedTuple = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
+function hc_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
 
@@ -603,15 +597,11 @@ end
     return first(arms), first(parms)
 end
 
-sha(T::Type, parms::ParameterVector, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+sha(T::Type, parms, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     _sha(T, parms, data, budget, mode, rate, maximize)[2]
-sha(T::Type, space::FiniteSpace, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
-    sha(T, collect(space), data, budget, mode = mode, rate = rate, maximize = maximize)
 
-sha_fit(T::Type, parms::ParameterVector, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+sha_fit(T::Type, parms, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     _sha(T, parms, data, budget, mode, rate, maximize)[1]
-sha_fit(T::Type, space::FiniteSpace, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
-    sha_fit(T, collect(space), data, budget, mode = mode, rate = rate, maximize = maximize)
 
 @inline function _hyperband(T, space, data, budget, rate, maximize)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
@@ -690,14 +680,10 @@ hyperband_fit(T::Type, space::AbstractSpace, data::UnaryResampler, budget::Budge
     return first(arms), first(parms)
 end
 
-sasha(T::Type, parms::ParameterVector, data::UnaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
+sasha(T::Type, parms, data::UnaryResampler; args = (), temp::Real = 1, maximize::Bool = false) =
     _sasha(T, parms, data, args, temp, maximize)[2]
-sasha(T::Type, space::FiniteSpace, data::UnaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
-    sasha(T, collect(space), data, args = args, temp = temp, maximize = maximize)
 
-sasha_fit(T::Type, parms::ParameterVector, data::UnaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
+sasha_fit(T::Type, parms, data::UnaryResampler; args = (), temp::Real = 1, maximize::Bool = false) =
     _sasha(T, parms, data, args, temp, maximize)[1]
-sasha_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args::NamedTuple = (), temp::Real = 1, maximize::Bool = false) =
-    sasha_fit(T, collect(space), data, args = args, temp = temp, maximize = maximize)
 
 end
