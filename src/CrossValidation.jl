@@ -191,8 +191,8 @@ sample(iter, n) = sample(GLOBAL_RNG, iter, n)
 sample(iter) = sample(iter, 1)
 
 abstract type AbstractDistribution end
+
 abstract type DiscreteDistribution <: AbstractDistribution end
-abstract type ContinousDistribution <: AbstractDistribution end
 
 Base.eltype(d::DiscreteDistribution) = eltype(values(d))
 Base.length(d::DiscreteDistribution) = length(values(d))
@@ -200,19 +200,19 @@ Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
 Base.iterate(d::DiscreteDistribution) = iterate(values(d))
 Base.iterate(d::DiscreteDistribution, state) = iterate(values(d), state)
 
-struct Discrete{S, P<:AbstractFloat} <: DiscreteDistribution
-    vals::S
+struct Discrete{T, P<:AbstractFloat} <: DiscreteDistribution
+    vals::T
     probs::Vector{P}
-    function Discrete(states::S, probs::Vector{P}) where {S, P<:AbstractFloat}
+    function Discrete(states::T, probs::Vector{P}) where {T, P<:AbstractFloat}
         length(states) == length(probs) || throw(ArgumentError("lenghts of states and probabilities do not match"))
         (all(probs .≥ 0) && isapprox(sum(probs), 1)) || throw(ArgumentError("invalid probabilities provided"))
-        return new{S, P}(states, probs)
+        return new{T, P}(states, probs)
     end
 end
 
 Base.values(d::Discrete) = d.vals
 
-function rand(rng::AbstractRNG, d::Discrete{S, P}) where {S, P}
+function rand(rng::AbstractRNG, d::Discrete{T, P}) where {T, P}
     c = zero(P)
     q = rand(rng)
     for (state, p) in zip(d.vals, d.probs)
@@ -224,15 +224,19 @@ function rand(rng::AbstractRNG, d::Discrete{S, P}) where {S, P}
     throw(ErrorException("could not generate random element from distribution"))
 end
 
-struct DiscreteUniform{S} <: DiscreteDistribution
-    vals::S
+struct DiscreteUniform{T} <: DiscreteDistribution
+    vals::T
 end
 
 Base.values(d::DiscreteUniform) = d.vals
 
 rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.vals)
 
-struct Uniform{S<:Real, P<:Real} <: ContinousDistribution
+abstract type ContinousDistribution{S} <: AbstractDistribution end
+
+Base.eltype(d::ContinousDistribution{S}) where S = S
+
+struct Uniform{S<:Real, P<:Real} <: ContinousDistribution{S}
     a::P
     b::P
     function Uniform{S}(a::Real, b::Real) where S<:Real
@@ -249,7 +253,7 @@ rand(rng::AbstractRNG, d::Uniform{S, P}) where {S<:Unsigned, P} = round(S, abs(d
 rand(rng::AbstractRNG, d::Uniform{S, P}) where {S<:Signed, P} = round(S, d.a + (d.b - d.a) * rand(rng, float(P)))
 rand(rng::AbstractRNG, d::Uniform{S, P}) where {S<:Bool, P} = S(d.a + (d.b - d.a) * rand(rng, float(P)) ≥ 0.5)
 
-struct LogUniform{S<:Real, P<:Real} <: ContinousDistribution
+struct LogUniform{S<:Real, P<:Real} <: ContinousDistribution{S}
     a::P
     b::P
     function LogUniform{S}(a::Real, b::Real) where S<:Real
@@ -266,7 +270,7 @@ rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S<:Unsigned, P} = round(S, ab
 rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S<:Signed, P} = round(S, exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))))
 rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S<:Bool, P} = S(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))) ≥ 0.5)
 
-struct Normal{S<:Real, P<:Real} <: ContinousDistribution
+struct Normal{S<:Real, P<:Real} <: ContinousDistribution{S}
     mean::P
     std::P
     function Normal{S}(mean::Real, std::Real) where S<:Real
