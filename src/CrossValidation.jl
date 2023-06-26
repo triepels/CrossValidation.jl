@@ -31,13 +31,12 @@ restype(x) = restype(typeof(x))
 restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
 restype(x::Type{T}) where T = T
 
-abstract type AbstractResampler end
+abstract type AbstractResampler{D} end
+abstract type UnaryResampler{D} <: AbstractResampler{D} end
 
-abstract type UnaryResampler <: AbstractResampler end
+Base.eltype(::Type{R}) where R<:AbstractResampler{D} where D = Tuple{restype(D), restype(D)}
 
-Base.eltype(r::AbstractResampler) = Tuple{restype(r.data), restype(r.data)}
-
-struct FixedSplit{D} <: UnaryResampler
+struct FixedSplit{D} <: UnaryResampler{D}
     data::D
     m::Int
     function FixedSplit(data, m::Int)
@@ -58,7 +57,7 @@ Base.length(r::FixedSplit) = 1
     return (x, y), state + 1
 end
 
-struct RandomSplit{D} <: UnaryResampler
+struct RandomSplit{D} <: UnaryResampler{D}
     data::D
     m::Int
     perm::Vector{Int}
@@ -80,7 +79,7 @@ Base.length(r::RandomSplit) = 1
     return (x, y), state + 1
 end
 
-struct LeaveOneOut{D} <: AbstractResampler
+struct LeaveOneOut{D} <: AbstractResampler{D}
     data::D
     function LeaveOneOut(data)
         n = nobs(data)
@@ -98,7 +97,7 @@ Base.length(r::LeaveOneOut) = nobs(r.data)
     return (x, y), state + 1
 end
 
-struct KFold{D} <: AbstractResampler
+struct KFold{D} <: AbstractResampler{D}
     data::D
     k::Int
     perm::Vector{Int}
@@ -121,7 +120,7 @@ Base.length(r::KFold) = r.k
     return (x, y), state + 1
 end
 
-struct ForwardChaining{D} <: AbstractResampler
+struct ForwardChaining{D} <: AbstractResampler{D}
     data::D
     init::Int
     out::Int
@@ -147,7 +146,7 @@ end
     return (x, y), state + 1
 end
 
-struct SlidingWindow{D} <: AbstractResampler
+struct SlidingWindow{D} <: AbstractResampler{D}
     data::D
     window::Int
     out::Int
@@ -191,28 +190,30 @@ sample(iter, n) = sample(GLOBAL_RNG, iter, n)
 sample(iter) = sample(iter, 1)
 
 abstract type AbstractDistribution end
+abstract type DiscreteDistribution{V} <: AbstractDistribution end
+abstract type ContinousDistribution{S} <: AbstractDistribution end
 
-abstract type DiscreteDistribution <: AbstractDistribution end
+Base.eltype(::Type{D}) where D<:DiscreteDistribution{V} where V = eltype(V)
+Base.eltype(::Type{D}) where D<:ContinousDistribution{S} where S = S
 
-Base.eltype(d::DiscreteDistribution) = eltype(values(d))
 Base.length(d::DiscreteDistribution) = length(values(d))
 Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
 Base.iterate(d::DiscreteDistribution) = iterate(values(d))
 Base.iterate(d::DiscreteDistribution, state) = iterate(values(d), state)
 
-struct Discrete{T, P<:AbstractFloat} <: DiscreteDistribution
-    vals::T
+struct Discrete{V, P<:AbstractFloat} <: DiscreteDistribution{V}
+    vals::V
     probs::Vector{P}
-    function Discrete(states::T, probs::Vector{P}) where {T, P<:AbstractFloat}
-        length(states) == length(probs) || throw(ArgumentError("lenghts of states and probabilities do not match"))
+    function Discrete(vals::V, probs::Vector{P}) where {V, P<:AbstractFloat}
+        length(vals) == length(probs) || throw(ArgumentError("lenghts of values and probabilities do not match"))
         (all(probs .≥ 0) && isapprox(sum(probs), 1)) || throw(ArgumentError("invalid probabilities provided"))
-        return new{T, P}(states, probs)
+        return new{V, P}(vals, probs)
     end
 end
 
 Base.values(d::Discrete) = d.vals
 
-function rand(rng::AbstractRNG, d::Discrete{T, P}) where {T, P}
+function rand(rng::AbstractRNG, d::Discrete{V, P}) where {V, P}
     c = zero(P)
     q = rand(rng)
     for (state, p) in zip(d.vals, d.probs)
@@ -224,17 +225,13 @@ function rand(rng::AbstractRNG, d::Discrete{T, P}) where {T, P}
     throw(ErrorException("could not generate random element from distribution"))
 end
 
-struct DiscreteUniform{T} <: DiscreteDistribution
-    vals::T
+struct DiscreteUniform{V} <: DiscreteDistribution{V}
+    vals::V
 end
 
 Base.values(d::DiscreteUniform) = d.vals
 
 rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.vals)
-
-abstract type ContinousDistribution{S} <: AbstractDistribution end
-
-Base.eltype(d::ContinousDistribution{S}) where S = S
 
 struct Uniform{S<:Real, P<:Real} <: ContinousDistribution{S}
     a::P
@@ -293,9 +290,9 @@ struct FiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
 end
 
-Base.eltype(s::FiniteSpace{names, T}) where {names, T} = NamedTuple{names, Tuple{map(eltype, s.vars)...}}
-Base.length(s::FiniteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
+Base.eltype(::Type{S}) where S<:FiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
 
+Base.length(s::FiniteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
 Base.keys(s::FiniteSpace) = OneTo(length(s))
 Base.firstindex(s::FiniteSpace) = 1
 Base.lastindex(s::FiniteSpace) = length(s)
@@ -331,7 +328,7 @@ struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
 end
 
-Base.eltype(s::InfiniteSpace{names, T}) where {names, T} = NamedTuple{names, Tuple{map(eltype, s.vars)...}}
+Base.eltype(::Type{S}) where S<:InfiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
 
 rand(rng::AbstractRNG, space::InfiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
 
@@ -540,7 +537,7 @@ _cast(::Type{T}, x::Real, r) where T <: Real = T(x)
 _cast(::Type{T}, x::AbstractFloat, r) where T <: Integer = round(T, x, r)
 _cast(::Type{T}, x::T, r) where T <: Real = x
 
-struct AllocationMode{T} end
+struct AllocationMode{M} end
 
 const GeometricAllocation = AllocationMode{:Geometric}()
 const ConstantAllocation = AllocationMode{:Constant}()
