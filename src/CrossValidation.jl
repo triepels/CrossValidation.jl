@@ -364,7 +364,7 @@ end
     return loss
 end
 
-@inline function _fit_models(T, parms, train, test, args)
+@inline function _fit_split(T, parms, train, test, args)
     models = pmap(x -> _fit!(T(; x...), train, args), parms)
     loss = map(x -> _loss(x, test), models)
     @debug "Fitted models" parms args loss
@@ -402,7 +402,7 @@ function brute_fit(T::Type, parms, data::UnaryResampler; args = (), maximize::Bo
     train, val = first(data)
 
     @debug "Start brute-force search"
-    models, loss = _fit_models(T, parms, train, val, args)
+    models, loss = _fit_split(T, parms, train, val, args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     
@@ -503,7 +503,7 @@ function hc_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args = (), ns
     while !isempty(cand)
         append!(bl, cand)
 
-        models, loss = _fit_models(T, space[cand], train, val, args)
+        models, loss = _fit_split(T, space[cand], train, val, args)
 
         if maximize
             i = argmax(loss)
