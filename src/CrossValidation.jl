@@ -480,7 +480,6 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args = (), nst
         end
 
         parm, best = parms[i], loss[i]
-
         cand = _neighbors(space, cand[i], k, bl)
     end
     @debug "Finished hill-climbing"
@@ -514,7 +513,6 @@ function hc_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args = (), ns
         end
 
         model, best = models[i], loss[i]
-
         cand = _neighbors(space, cand[i], k, bl)
     end
     @debug "Finished hill-climbing"
