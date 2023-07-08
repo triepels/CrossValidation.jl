@@ -174,22 +174,24 @@ end
     return (x, y), state + 1
 end
 
-function sample(rng::AbstractRNG, iter, n::Integer)
-    m = length(iter)
+function sample(rng::AbstractRNG, s, n::Integer)
+    m = length(s)
     1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
-    vals = sizehint!(eltype(iter)[], n)
+    vals = sizehint!(eltype(s)[], n)
     for _ in OneTo(n)
-        val = rand(rng, iter)
+        val = rand(rng, s)
         while val in vals
-            val = rand(rng, iter)
+            val = rand(rng, s)
         end
         push!(vals, val)
     end
     return vals
 end
 
-sample(iter, n) = sample(GLOBAL_RNG, iter, n)
-sample(iter) = sample(iter, 1)
+sample(rng::AbstractRNG, s) = rand(rng, s)
+
+sample(s, n) = sample(GLOBAL_RNG, s, n)
+sample(s) = sample(GLOBAL_RNG, s)
 
 abstract type AbstractDistribution end
 abstract type DiscreteDistribution{V} <: AbstractDistribution end
@@ -321,10 +323,8 @@ end
     return s[state], state + 1
 end
 
-rand(rng::AbstractRNG, space::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
-
-sample(rng::AbstractRNG, space::FiniteSpace) = rand(rng, space)
-sample(rng::AbstractRNG, space::FiniteSpace, n::Int) = [space[i] for i in sample(rng, OneTo(length(space)), n)]
+rand(rng::AbstractRNG, s::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
+sample(rng::AbstractRNG, s::FiniteSpace, n::Int) = [s[i] for i in sample(rng, OneTo(length(s)), n)]
 
 struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
@@ -332,10 +332,8 @@ end
 
 Base.eltype(::Type{S}) where S<:InfiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
 
-rand(rng::AbstractRNG, space::InfiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), space.vars))
-
-sample(rng::AbstractRNG, space::InfiniteSpace) = rand(rng, space)
-sample(rng::AbstractRNG, space::InfiniteSpace, n::Int) = [sample(rng, space) for _ in OneTo(n)]
+rand(rng::AbstractRNG, s::InfiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
+sample(rng::AbstractRNG, s::InfiniteSpace, n::Int) = [rand(rng, s) for _ in OneTo(n)]
 
 space(; vars...) = space(keys(vars), values(values(vars)))
 space(names, vars::Tuple{Vararg{DiscreteDistribution}}) = FiniteSpace{names, typeof(vars)}(vars)
