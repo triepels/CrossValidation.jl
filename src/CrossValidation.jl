@@ -6,7 +6,7 @@ using Distributed: pmap
 
 import Random: rand
 
-export AbstractResampler, UnaryResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
+export AbstractResampler, MonadicResampler, VariadicResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, FiniteSpace, InfiniteSpace, space,
        AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal, sample,
        Budget, AllocationMode, GeometricAllocation, ConstantAllocation, HyperbandAllocation, allocate,
@@ -32,13 +32,13 @@ restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
 restype(x::Type{T}) where T = T
 
 abstract type AbstractResampler end
-abstract type UnaryResampler{D} <: AbstractResampler end
-abstract type PolyadicResampler{D} <: AbstractResampler end
+abstract type MonadicResampler{D} <: AbstractResampler end
+abstract type VariadicResampler{D} <: AbstractResampler end
 
-Base.eltype(::Type{R}) where R<:UnaryResampler{D} where D = Tuple{restype(D), restype(D)}
-Base.eltype(::Type{R}) where R<:PolyadicResampler{D} where D = Tuple{restype(D), restype(D)}
+Base.eltype(::Type{R}) where R<:MonadicResampler{D} where D = Tuple{restype(D), restype(D)}
+Base.eltype(::Type{R}) where R<:VariadicResampler{D} where D = Tuple{restype(D), restype(D)}
 
-struct FixedSplit{D} <: UnaryResampler{D}
+struct FixedSplit{D} <: MonadicResampler{D}
     data::D
     m::Int
     function FixedSplit(data, m::Int)
@@ -59,7 +59,7 @@ Base.length(r::FixedSplit) = 1
     return (x, y), state + 1
 end
 
-struct RandomSplit{D} <: UnaryResampler{D}
+struct RandomSplit{D} <: MonadicResampler{D}
     data::D
     m::Int
     perm::Vector{Int}
@@ -81,7 +81,7 @@ Base.length(r::RandomSplit) = 1
     return (x, y), state + 1
 end
 
-struct LeaveOneOut{D} <: PolyadicResampler{D}
+struct LeaveOneOut{D} <: VariadicResampler{D}
     data::D
     function LeaveOneOut(data)
         n = nobs(data)
@@ -99,7 +99,7 @@ Base.length(r::LeaveOneOut) = nobs(r.data)
     return (x, y), state + 1
 end
 
-struct KFold{D} <: PolyadicResampler{D}
+struct KFold{D} <: VariadicResampler{D}
     data::D
     k::Int
     perm::Vector{Int}
@@ -122,7 +122,7 @@ Base.length(r::KFold) = r.k
     return (x, y), state + 1
 end
 
-struct ForwardChaining{D} <: PolyadicResampler{D}
+struct ForwardChaining{D} <: VariadicResampler{D}
     data::D
     init::Int
     out::Int
@@ -148,7 +148,7 @@ end
     return (x, y), state + 1
 end
 
-struct SlidingWindow{D} <: PolyadicResampler{D}
+struct SlidingWindow{D} <: VariadicResampler{D}
     data::D
     window::Int
     out::Int
@@ -383,7 +383,7 @@ function brute(T::Type, parms, data::AbstractResampler; args = (), maximize::Boo
     return parms[ind]
 end
 
-function brute_fit(T::Type, parms, data::UnaryResampler; args = (), maximize::Bool = false)
+function brute_fit(T::Type, parms, data::MonadicResampler; args = (), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     train, val = first(data)
@@ -474,7 +474,7 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args = (), nst
     return parm
 end
 
-function hc_fit(T::Type, space::FiniteSpace, data::UnaryResampler; args = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
+function hc_fit(T::Type, space::FiniteSpace, data::MonadicResampler; args = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
 
@@ -582,10 +582,10 @@ end
     return first(arms), first(parms)
 end
 
-sha(T::Type, parms, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+sha(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     _sha(T, parms, data, budget, mode, rate, maximize)[2]
 
-sha_fit(T::Type, parms, data::UnaryResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+sha_fit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     _sha(T, parms, data, budget, mode, rate, maximize)[1]
 
 @inline function _hyperband(T, space, data, budget, rate, maximize)
@@ -629,9 +629,9 @@ sha_fit(T::Type, parms, data::UnaryResampler, budget::Budget; mode::AllocationMo
     return arm, parm
 end
 
-hyperband(T::Type, space::AbstractSpace, data::UnaryResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+hyperband(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
     _hyperband(T, space, data, budget, rate, maximize)[2]
-hyperband_fit(T::Type, space::AbstractSpace, data::UnaryResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+hyperband_fit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
     _hyperband(T, space, data, budget, rate, maximize)[1]
  
 @inline function _sasha(T, parms, data, args, temp, maximize)
@@ -665,10 +665,10 @@ hyperband_fit(T::Type, space::AbstractSpace, data::UnaryResampler, budget::Budge
     return first(arms), first(parms)
 end
 
-sasha(T::Type, parms, data::UnaryResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+sasha(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
     _sasha(T, parms, data, args, temp, maximize)[2]
 
-sasha_fit(T::Type, parms, data::UnaryResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+sasha_fit(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
     _sasha(T, parms, data, args, temp, maximize)[1]
 
 end
