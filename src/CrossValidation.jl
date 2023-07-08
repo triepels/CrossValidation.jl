@@ -7,7 +7,7 @@ using Distributed: pmap
 import Random: rand
 
 export AbstractResampler, UnaryResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
-       AbstractSpace, FiniteSpace, InfiniteSpace, space, ParameterVector,
+       AbstractSpace, FiniteSpace, InfiniteSpace, space,
        AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal, sample,
        Budget, AllocationMode, GeometricAllocation, ConstantAllocation, HyperbandAllocation, allocate,
        fit!, loss, validate, brute, brute_fit, hc, hc_fit, sha, sha_fit, hyperband, hyperband_fit, sasha, sasha_fit
@@ -338,8 +338,6 @@ sample(rng::AbstractRNG, s::InfiniteSpace, n::Int) = [rand(rng, s) for _ in OneT
 space(; vars...) = space(keys(vars), values(values(vars)))
 space(names, vars::Tuple{Vararg{DiscreteDistribution}}) = FiniteSpace{names, typeof(vars)}(vars)
 space(names, vars::Tuple{Vararg{AbstractDistribution}}) = InfiniteSpace{names, typeof(vars)}(vars)
-
-const ParameterVector = Array{NamedTuple{names, T}, 1} where {names, T}
 
 _fit!(model, x::Union{Tuple, NamedTuple}, args) = fit!(model, x...; args...)
 _fit!(model, x, args) = fit!(model, x; args...)
