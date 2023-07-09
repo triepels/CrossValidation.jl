@@ -249,7 +249,7 @@ end
 
 Uniform(a::Real, b::Real) = Uniform{Float64}(a, b)
 
-rand(rng::AbstractRNG, d::Uniform{S, P}) where {S, P} = S(d.a + (d.b - d.a) * rand(rng, float(P)))
+rand(rng::AbstractRNG, d::Uniform{S, P}) where {S, P} = S(d.a + (d.b - d.a) * rand(rng, S))
 
 struct LogUniform{S<:AbstractFloat, P<:Real} <: ContinousDistribution{S}
     a::P
@@ -263,7 +263,7 @@ end
 
 LogUniform(a::Real, b::Real) = LogUniform{Float64}(a, b)
 
-rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S, P} = S(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, float(P))))
+rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S, P} = S(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, S)))
 
 struct Normal{S<:AbstractFloat, P<:Real} <: ContinousDistribution{S}
     mean::P
@@ -277,7 +277,7 @@ end
 
 Normal(mean::Real, std::Real) = Normal{Float64}(mean, std)
 
-rand(rng::AbstractRNG, d::Normal{S, P}) where {S, P} = S(d.mean + d.std * randn(rng, float(P)))
+rand(rng::AbstractRNG, d::Normal{S, P}) where {S, P} = S(d.mean + d.std * randn(rng, S))
 
 abstract type AbstractSpace end
 
