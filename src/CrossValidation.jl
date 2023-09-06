@@ -315,7 +315,6 @@ end
 end
 
 rand(rng::AbstractRNG, s::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
-sample(rng::AbstractRNG, s::FiniteSpace, n::Int) = [s[i] for i in sample(rng, OneTo(length(s)), n)]
 
 struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
