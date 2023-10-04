@@ -226,7 +226,7 @@ function rand(rng::AbstractRNG, d::Discrete{V, P}) where {V, P}
             return state
         end
     end
-    throw(ErrorException("could not generate random element from distribution"))
+    return last(d.vals)
 end
 
 struct DiscreteUniform{V} <: DiscreteDistribution{V}
