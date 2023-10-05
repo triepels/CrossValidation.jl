@@ -206,9 +206,9 @@ Base.iterate(d::DiscreteDistribution) = iterate(values(d))
 Base.iterate(d::DiscreteDistribution, state) = iterate(values(d), state)
 
 struct Discrete{V, P<:AbstractFloat} <: DiscreteDistribution{V}
-    vals::V
+    vals::Vector{V}
     probs::Vector{P}
-    function Discrete(vals::V, probs::Vector{P}) where {V, P<:AbstractFloat}
+    function Discrete(vals::Vector{V}, probs::Vector{P}) where {V, P<:AbstractFloat}
         length(vals) == length(probs) || throw(ArgumentError("lenghts of values and probabilities do not match"))
         (all(probs .≥ 0) && isapprox(sum(probs), 1)) || throw(ArgumentError("invalid probabilities provided"))
         return new{V, P}(vals, probs)
@@ -230,7 +230,7 @@ function rand(rng::AbstractRNG, d::Discrete{V, P}) where {V, P}
 end
 
 struct DiscreteUniform{V} <: DiscreteDistribution{V}
-    vals::V
+    vals::Vector{V}
 end
 
 Base.values(d::DiscreteUniform) = d.vals
