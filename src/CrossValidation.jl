@@ -193,31 +193,30 @@ sample(rng::AbstractRNG, s) = rand(rng, s)
 sample(s, n) = sample(GLOBAL_RNG, s, n)
 sample(s) = sample(GLOBAL_RNG, s)
 
-abstract type AbstractDistribution end
-abstract type DiscreteDistribution{V} <: AbstractDistribution end
-abstract type ContinousDistribution{S} <: AbstractDistribution end
+abstract type AbstractDistribution{T} end
+abstract type DiscreteDistribution{T} <: AbstractDistribution{T} end
+abstract type ContinousDistribution{T} <: AbstractDistribution{T} end
 
-Base.eltype(::Type{D}) where D<:DiscreteDistribution{V} where V = eltype(V)
-Base.eltype(::Type{D}) where D<:ContinousDistribution{S} where S = S
+Base.eltype(::Type{D}) where D<:AbstractDistribution{T} where T = eltype(T)
 
 Base.length(d::DiscreteDistribution) = length(values(d))
 Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
 Base.iterate(d::DiscreteDistribution) = iterate(values(d))
 Base.iterate(d::DiscreteDistribution, state) = iterate(values(d), state)
 
-struct Discrete{V, P<:AbstractFloat} <: DiscreteDistribution{V}
-    vals::Vector{V}
-    probs::Vector{P}
-    function Discrete(vals::Vector{V}, probs::Vector{P}) where {V, P<:AbstractFloat}
+struct Discrete{T<:AbstractVector} <: DiscreteDistribution{T}
+    vals::T
+    probs::Vector{Float64}
+    function Discrete(vals::T, probs::Vector{AbstractFloat}) where T<:AbstractVector
         length(vals) == length(probs) || throw(ArgumentError("lenghts of values and probabilities do not match"))
         (all(probs .≥ 0) && isapprox(sum(probs), 1)) || throw(ArgumentError("invalid probabilities provided"))
-        return new{V, P}(vals, probs)
+        return new{T}(vals, probs)
     end
 end
 
 Base.values(d::Discrete) = d.vals
 
-function rand(rng::AbstractRNG, d::Discrete{V, P}) where {V, P}
+function rand(rng::AbstractRNG, d::Discrete)
     c = zero(P)
     q = rand(rng)
     for (state, p) in zip(d.vals, d.probs)
@@ -229,55 +228,52 @@ function rand(rng::AbstractRNG, d::Discrete{V, P}) where {V, P}
     return last(d.vals)
 end
 
-struct DiscreteUniform{V} <: DiscreteDistribution{V}
-    vals::Vector{V}
+struct DiscreteUniform{T<:AbstractVector} <: DiscreteDistribution{T}
+    vals::T
 end
 
 Base.values(d::DiscreteUniform) = d.vals
 
 rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.vals)
 
-struct Uniform{S<:AbstractFloat, P<:Real} <: ContinousDistribution{S}
-    a::P
-    b::P
-    function Uniform{S}(a::Real, b::Real) where S<:AbstractFloat
+struct Uniform{T<:AbstractFloat} <: ContinousDistribution{T}
+    a::Float64
+    b::Float64
+    function Uniform{T}(a::Real, b::Real) where T<:AbstractFloat
         a < b || throw(ArgumentError("a must be smaller than b"))
-        a, b = promote(a, b)
-        return new{S, typeof(a)}(a, b)
+        return new{T}(a, b)
     end
 end
 
 Uniform(a::Real, b::Real) = Uniform{Float64}(a, b)
 
-rand(rng::AbstractRNG, d::Uniform{S, P}) where {S, P} = S(d.a + (d.b - d.a) * rand(rng, S))
+rand(rng::AbstractRNG, d::Uniform{T}) where T = T(d.a + (d.b - d.a) * rand(rng, T))
 
-struct LogUniform{S<:AbstractFloat, P<:Real} <: ContinousDistribution{S}
-    a::P
-    b::P
-    function LogUniform{S}(a::Real, b::Real) where S<:AbstractFloat
+struct LogUniform{T<:AbstractFloat} <: ContinousDistribution{T}
+    a::Float64
+    b::Float64
+    function LogUniform{T}(a::Real, b::Real) where T<:AbstractFloat
         a < b || throw(ArgumentError("a must be smaller than b"))
-        a, b = promote(a, b)
-        return new{S, typeof(a)}(a, b)
+        return new{T}(a, b)
     end
 end
 
 LogUniform(a::Real, b::Real) = LogUniform{Float64}(a, b)
 
-rand(rng::AbstractRNG, d::LogUniform{S, P}) where {S, P} = S(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, S)))
+rand(rng::AbstractRNG, d::LogUniform{T}) where T = T(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, T)))
 
-struct Normal{S<:AbstractFloat, P<:Real} <: ContinousDistribution{S}
-    mean::P
-    std::P
-    function Normal{S}(mean::Real, std::Real) where S<:AbstractFloat
+struct Normal{T<:AbstractFloat} <: ContinousDistribution{T}
+    mean::Float64
+    std::Float64
+    function Normal{T}(mean::Real, std::Real) where T<:AbstractFloat
         std > zero(std) || throw(ArgumentError("standard deviation must be larger than zero"))
-        mean, std = promote(mean, std)
-        return new{S, typeof(mean)}(mean, std)
+        return new{T}(mean, std)
     end
 end
 
 Normal(mean::Real, std::Real) = Normal{Float64}(mean, std)
 
-rand(rng::AbstractRNG, d::Normal{S, P}) where {S, P} = S(d.mean + d.std * randn(rng, S))
+rand(rng::AbstractRNG, d::Normal{T}) where T = T(d.mean + d.std * randn(rng, T))
 
 abstract type AbstractSpace end
 
