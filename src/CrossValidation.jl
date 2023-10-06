@@ -318,7 +318,7 @@ end
 
 Base.eltype(::Type{S}) where S<:InfiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
 
-rand(rng::AbstractRNG, s::InfiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
+rand(rng::AbstractRNG, s::InfiniteSpace{names}) where names = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
 sample(rng::AbstractRNG, s::InfiniteSpace, n::Int) = [rand(rng, s) for _ in OneTo(n)]
 
 space(; vars...) = space(keys(vars), values(values(vars)))
