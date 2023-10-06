@@ -290,18 +290,18 @@ Base.lastindex(s::FiniteSpace) = length(s)
 
 Base.size(s::FiniteSpace) = length(s.vars) == 0 ? (0,) : map(length, s.vars)
 
-@inline function Base.getindex(s::FiniteSpace{names, T}, i::Int) where {names, T}
+@inline function Base.getindex(s::FiniteSpace{names}, i::Int) where names
     @boundscheck 1 ≤ i ≤ length(s) || throw(BoundsError(s, i))
     strides = (1, cumprod(map(length, Base.front(s.vars)))...)
     return NamedTuple{names}(map(getindex, s.vars, mod.((i - 1) .÷ strides, size(s)) .+ 1))
 end
 
-@inline function Base.getindex(s::FiniteSpace{names, T}, I::Vararg{Int, N}) where {names, T, N}
+@inline function Base.getindex(s::FiniteSpace{names}, I::Vararg{Int}) where names
     @boundscheck length(I) == length(s.vars) && all(1 .≤ I .≤ size(s)) || throw(BoundsError(s, I))
     return NamedTuple{names}(map(getindex, s.vars, I))
 end
 
-@inline function Base.getindex(s::FiniteSpace{names, T}, inds::Vector{Int}) where {names, T}
+@inline function Base.getindex(s::FiniteSpace{names}, inds::Vector{Int}) where names
     return [s[i] for i in inds]
 end
 
@@ -310,7 +310,7 @@ end
     return s[state], state + 1
 end
 
-rand(rng::AbstractRNG, s::FiniteSpace{names}) where {names} = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
+rand(rng::AbstractRNG, s::FiniteSpace{names}) where names = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
 
 struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
