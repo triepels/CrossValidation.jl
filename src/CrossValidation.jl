@@ -50,15 +50,6 @@ end
 
 FixedSplit(data, ratio::Real) = FixedSplit(data, floor(Int, nobs(data) * ratio))
 
-Base.length(r::FixedSplit) = 1
-
-@propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
-    state > 1 && return nothing
-    x = getobs(r.data, OneTo(r.m))
-    y = getobs(r.data, (r.m + 1):nobs(r.data))
-    return (x, y), state + 1
-end
-
 struct RandomSplit{D} <: MonadicResampler{D}
     data::D
     m::Int
@@ -72,15 +63,6 @@ end
 
 RandomSplit(data, ratio::Real) = RandomSplit(data, floor(Int, nobs(data) * ratio))
 
-Base.length(r::RandomSplit) = 1
-
-@propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
-    state > 1 && return nothing
-    x = getobs(r.data, r.perm[OneTo(r.m)])
-    y = getobs(r.data, r.perm[(r.m + 1):nobs(r.data)])
-    return (x, y), state + 1
-end
-
 struct LeaveOneOut{D} <: VariadicResampler{D}
     data::D
     function LeaveOneOut(data)
@@ -88,15 +70,6 @@ struct LeaveOneOut{D} <: VariadicResampler{D}
         n > 1 || throw(ArgumentError("data has too few observations to split"))
         return new{typeof(data)}(data)
     end
-end
-
-Base.length(r::LeaveOneOut) = nobs(r.data)
-
-@propagate_inbounds function Base.iterate(r::LeaveOneOut, state = 1)
-    state > length(r) && return nothing
-    x = getobs(r.data, union(OneTo(state - 1), (state + 1):nobs(r.data)))
-    y = getobs(r.data, state:state)
-    return (x, y), state + 1
 end
 
 struct KFold{D} <: VariadicResampler{D}
@@ -108,18 +81,6 @@ struct KFold{D} <: VariadicResampler{D}
         1 < k ≤ n || throw(ArgumentError("data cannot be partitioned into $k folds"))
         return new{typeof(data)}(data, k, shuffle!([OneTo(n);]))
     end
-end
-
-Base.length(r::KFold) = r.k
-
-@propagate_inbounds function Base.iterate(r::KFold, state = 1)
-    state > length(r) && return nothing
-    n = nobs(r.data)
-    m, w = mod(n, r.k), floor(Int, n / r.k)
-    fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
-    x = getobs(r.data, r.perm[setdiff(OneTo(n), fold)])
-    y = getobs(r.data, r.perm[fold])
-    return (x, y), state + 1
 end
 
 struct ForwardChaining{D} <: VariadicResampler{D}
@@ -136,18 +97,6 @@ struct ForwardChaining{D} <: VariadicResampler{D}
     end
 end
 
-function Base.length(r::ForwardChaining)
-    l = (nobs(r.data) - r.init) / r.out
-    return r.partial ? ceil(Int, l) : floor(Int, l)
-end
-
-@propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
-    state > length(r) && return nothing
-    x = getobs(r.data, OneTo(r.init + (state - 1) * r.out))
-    y = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, nobs(r.data)))
-    return (x, y), state + 1
-end
-
 struct SlidingWindow{D} <: VariadicResampler{D}
     data::D
     window::Int
@@ -162,9 +111,57 @@ struct SlidingWindow{D} <: VariadicResampler{D}
     end
 end
 
+Base.length(r::FixedSplit) = 1
+Base.length(r::RandomSplit) = 1
+Base.length(r::LeaveOneOut) = nobs(r.data)
+Base.length(r::KFold) = r.k
+
+function Base.length(r::ForwardChaining)
+    l = (nobs(r.data) - r.init) / r.out
+    return r.partial ? ceil(Int, l) : floor(Int, l)
+end
+
 function Base.length(r::SlidingWindow)
     l = (nobs(r.data) - r.window) / r.out
     return r.partial ? ceil(Int, l) : floor(Int, l)
+end
+
+@propagate_inbounds function Base.iterate(r::FixedSplit, state = 1)
+    state > 1 && return nothing
+    x = getobs(r.data, OneTo(r.m))
+    y = getobs(r.data, (r.m + 1):nobs(r.data))
+    return (x, y), state + 1
+end
+
+@propagate_inbounds function Base.iterate(r::RandomSplit, state = 1)
+    state > 1 && return nothing
+    x = getobs(r.data, r.perm[OneTo(r.m)])
+    y = getobs(r.data, r.perm[(r.m + 1):nobs(r.data)])
+    return (x, y), state + 1
+end
+
+@propagate_inbounds function Base.iterate(r::LeaveOneOut, state = 1)
+    state > length(r) && return nothing
+    x = getobs(r.data, union(OneTo(state - 1), (state + 1):nobs(r.data)))
+    y = getobs(r.data, state:state)
+    return (x, y), state + 1
+end
+
+@propagate_inbounds function Base.iterate(r::KFold, state = 1)
+    state > length(r) && return nothing
+    n = nobs(r.data)
+    m, w = mod(n, r.k), floor(Int, n / r.k)
+    fold = ((state - 1) * w + min(m, state - 1) + 1):(state * w + min(m, state))
+    x = getobs(r.data, r.perm[setdiff(OneTo(n), fold)])
+    y = getobs(r.data, r.perm[fold])
+    return (x, y), state + 1
+end
+
+@propagate_inbounds function Base.iterate(r::ForwardChaining, state = 1)
+    state > length(r) && return nothing
+    x = getobs(r.data, OneTo(r.init + (state - 1) * r.out))
+    y = getobs(r.data, (r.init + (state - 1) * r.out + 1):min(r.init + state * r.out, nobs(r.data)))
+    return (x, y), state + 1
 end
 
 @propagate_inbounds function Base.iterate(r::SlidingWindow, state = 1)
@@ -173,6 +170,9 @@ end
     y = getobs(r.data, (r.window + (state - 1) * r.out + 1):min(r.window + state * r.out, nobs(r.data)))
     return (x, y), state + 1
 end
+
+sample(rng::AbstractRNG, s) = rand(rng, s)
+sample(s) = sample(GLOBAL_RNG, s)
 
 function sample(rng::AbstractRNG, s, n::Integer)
     m = length(s)
@@ -188,21 +188,17 @@ function sample(rng::AbstractRNG, s, n::Integer)
     return vals
 end
 
-sample(rng::AbstractRNG, s) = rand(rng, s)
-
 sample(s, n) = sample(GLOBAL_RNG, s, n)
-sample(s) = sample(GLOBAL_RNG, s)
 
 abstract type AbstractDistribution{T} end
 abstract type DiscreteDistribution{T} <: AbstractDistribution{T} end
 abstract type ContinousDistribution{T} <: AbstractDistribution{T} end
 
 Base.eltype(::Type{D}) where D<:AbstractDistribution{T} where T = eltype(T)
-
-Base.length(d::DiscreteDistribution) = length(values(d))
 Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
 Base.iterate(d::DiscreteDistribution) = iterate(values(d))
 Base.iterate(d::DiscreteDistribution, state) = iterate(values(d), state)
+Base.length(d::DiscreteDistribution) = length(values(d))
 
 struct Discrete{T<:AbstractVector} <: DiscreteDistribution{T}
     vals::T
@@ -214,7 +210,12 @@ struct Discrete{T<:AbstractVector} <: DiscreteDistribution{T}
     end
 end
 
+struct DiscreteUniform{T<:AbstractVector} <: DiscreteDistribution{T}
+    vals::T
+end
+
 Base.values(d::Discrete) = d.vals
+Base.values(d::DiscreteUniform) = d.vals
 
 function rand(rng::AbstractRNG, d::Discrete)
     c = zero(P)
@@ -227,12 +228,6 @@ function rand(rng::AbstractRNG, d::Discrete)
     end
     return last(d.vals)
 end
-
-struct DiscreteUniform{T<:AbstractVector} <: DiscreteDistribution{T}
-    vals::T
-end
-
-Base.values(d::DiscreteUniform) = d.vals
 
 rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.vals)
 
@@ -247,8 +242,6 @@ end
 
 Uniform(a::Real, b::Real) = Uniform{Float64}(a, b)
 
-rand(rng::AbstractRNG, d::Uniform{T}) where T = T(d.a + (d.b - d.a) * rand(rng, T))
-
 struct LogUniform{T<:AbstractFloat} <: ContinousDistribution{T}
     a::Float64
     b::Float64
@@ -259,8 +252,6 @@ struct LogUniform{T<:AbstractFloat} <: ContinousDistribution{T}
 end
 
 LogUniform(a::Real, b::Real) = LogUniform{Float64}(a, b)
-
-rand(rng::AbstractRNG, d::LogUniform{T}) where T = T(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, T)))
 
 struct Normal{T<:AbstractFloat} <: ContinousDistribution{T}
     mean::Float64
@@ -273,6 +264,8 @@ end
 
 Normal(mean::Real, std::Real) = Normal{Float64}(mean, std)
 
+rand(rng::AbstractRNG, d::Uniform{T}) where T = T(d.a + (d.b - d.a) * rand(rng, T))
+rand(rng::AbstractRNG, d::LogUniform{T}) where T = T(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, T)))
 rand(rng::AbstractRNG, d::Normal{T}) where T = T(d.mean + d.std * randn(rng, T))
 
 abstract type AbstractSpace end
@@ -282,12 +275,10 @@ struct FiniteSpace{names, T<:Tuple} <: AbstractSpace
 end
 
 Base.eltype(::Type{S}) where S<:FiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
-
-Base.length(s::FiniteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
-Base.keys(s::FiniteSpace) = OneTo(length(s))
 Base.firstindex(s::FiniteSpace) = 1
+Base.keys(s::FiniteSpace) = OneTo(length(s))
 Base.lastindex(s::FiniteSpace) = length(s)
-
+Base.length(s::FiniteSpace) = length(s.vars) == 0 ? 0 : prod(length, s.vars)
 Base.size(s::FiniteSpace) = length(s.vars) == 0 ? (0,) : map(length, s.vars)
 
 @inline function Base.getindex(s::FiniteSpace{names}, i::Int) where names
