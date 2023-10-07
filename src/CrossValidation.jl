@@ -194,24 +194,27 @@ abstract type AbstractDistribution{T} end
 abstract type DiscreteDistribution{T} <: AbstractDistribution{T} end
 abstract type ContinousDistribution{T} <: AbstractDistribution{T} end
 
-Base.eltype(::Type{D}) where D<:AbstractDistribution{T} where T = eltype(T)
+Base.eltype(::Type{D}) where D<:AbstractDistribution{T} where T = T
 Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
 Base.iterate(d::DiscreteDistribution) = iterate(values(d))
 Base.iterate(d::DiscreteDistribution, state) = iterate(values(d), state)
 Base.length(d::DiscreteDistribution) = length(values(d))
 
-struct Discrete{T<:AbstractVector} <: DiscreteDistribution{T}
-    vals::T
+struct Discrete{T} <: DiscreteDistribution{T}
+    vals::Vector{T}
     probs::Vector{Float64}
-    function Discrete(vals::T, probs::Vector{P}) where {T<:AbstractVector, P<:Real}
+    function Discrete(vals::V, probs::Vector{P}) where {V, P<:Real}
         length(vals) == length(probs) || throw(ArgumentError("lenghts of values and probabilities do not match"))
         (all(probs .≥ 0) && isapprox(sum(probs), 1)) || throw(ArgumentError("invalid probabilities provided"))
-        return new{T}(vals, probs)
+        return new{eltype(V)}(vals, probs)
     end
 end
 
-struct DiscreteUniform{T<:AbstractVector} <: DiscreteDistribution{T}
-    vals::T
+struct DiscreteUniform{T} <: DiscreteDistribution{T}
+    vals::Vector{T}
+    function DiscreteUniform(vals::V) where V
+        return new{eltype(V)}(vals)
+    end
 end
 
 Base.values(d::Discrete) = d.vals
