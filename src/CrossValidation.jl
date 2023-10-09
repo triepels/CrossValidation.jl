@@ -396,10 +396,17 @@ end
     return (b - a) * rand(rng, T) + a
 end
 
-@propagate_inbounds neighbors(rng::AbstractRNG, d::AbstractDistribution, at, step, n::Int) = [neighbors(rng, d, at, step) for _ in OneTo(n)]
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::AbstractDistribution, at, step, n::Int)
+    return [neighbors(rng, d, at, step) for _ in OneTo(n)]
+end
 
-@propagate_inbounds neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at, step) where names = NamedTuple{names}(neighbors.(rng, s.vars, at, step))
-@propagate_inbounds neighbors(rng::AbstractRNG, s::AbstractSpace, at, step, n::Int) = [neighbors(rng, s, at, step) for _ in 1:n]
+@propagate_inbounds function neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at::NamedTuple{names}, step) where names
+    return NamedTuple{names}(neighbors.(rng, s.vars, values(at), step))
+end
+
+@propagate_inbounds function neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at::NamedTuple{names}, step, n::Int) where names
+    return [neighbors(rng, s, at, step) for _ in 1:n]
+end
 
 function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
@@ -419,7 +426,7 @@ function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResam
             loss[i] < best || break
         end
         parm, best = nbrs[i], loss[i]
-        nbrs = neighbors(rng, space, values(parm), step, n)
+        nbrs = neighbors(rng, space, parm, step, n)
     end
     @debug "Finished hill-climbing"
 
@@ -449,7 +456,7 @@ function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicRes
             loss[i] < best || break
         end
         model, best = models[i], loss[i]
-        nbrs = neighbors(rng, space, values(nbrs[i]), step, n)
+        nbrs = neighbors(rng, space, nbrs[i], step, n)
     end
     @debug "Finished hill-climbing"
 
