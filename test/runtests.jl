@@ -36,8 +36,8 @@ sp = space(a = DiscreteUniform(-8.0:1.0:8.0), b = DiscreteUniform(-8.0:1.0:8.0))
 brute(MyModel, sp, data, args = (epochs = 100,), maximize = false)
 brutefit(MyModel, sp, data, args = (epochs = 100,), maximize = false)
 
-brute(MyModel, sample(sp, 64), data, args = (epochs = 100,), maximize = false)
-brutefit(MyModel, sample(sp, 64), data, args = (epochs = 100,), maximize = false)
+brute(MyModel, rand(sp, 64), data, args = (epochs = 100,), maximize = false)
+brutefit(MyModel, rand(sp, 64), data, args = (epochs = 100,), maximize = false)
 
 hc(MyModel, sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
 hcfit(MyModel, sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
@@ -45,8 +45,8 @@ hcfit(MyModel, sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
 sha(MyModel, sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
 sha_fit(MyModel, sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
 
-sha(MyModel, sample(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
-sha_fit(MyModel, sample(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
+sha(MyModel, rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
+sha_fit(MyModel, rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
 
 hyperband(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
 hyperband_fit(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)

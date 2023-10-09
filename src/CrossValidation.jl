@@ -8,7 +8,7 @@ import Random: rand
 
 export AbstractResampler, MonadicResampler, VariadicResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, FiniteSpace, InfiniteSpace, space,
-       AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal, sample,
+       AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal,
        Budget, AllocationMode, GeometricAllocation, ConstantAllocation, HyperbandAllocation, allocate,
        fit!, loss, validate, brute, brutefit, hc, hcfit, sha, sha_fit, hyperband, hyperband_fit, sasha, sasha_fit
 
@@ -171,25 +171,6 @@ end
     return (x, y), state + 1
 end
 
-sample(rng::AbstractRNG, s) = rand(rng, s)
-sample(s) = sample(GLOBAL_RNG, s)
-
-function sample(rng::AbstractRNG, s, n::Integer)
-    m = length(s)
-    1 ≤ n ≤ m || throw(ArgumentError("cannot sample $n times without replacement"))
-    vals = sizehint!(eltype(s)[], n)
-    for _ in OneTo(n)
-        val = rand(rng, s)
-        while val in vals
-            val = rand(rng, s)
-        end
-        push!(vals, val)
-    end
-    return vals
-end
-
-sample(s, n) = sample(GLOBAL_RNG, s, n)
-
 abstract type AbstractDistribution{T} end
 abstract type DiscreteDistribution{T} <: AbstractDistribution{T} end
 abstract type ContinousDistribution{T} <: AbstractDistribution{T} end
@@ -322,7 +303,6 @@ end
 Base.eltype(::Type{S}) where S<:InfiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
 
 rand(rng::AbstractRNG, s::SamplerTrivial{InfiniteSpace{names, T}}) where {names, T} = NamedTuple{names}(map(x -> rand(rng, x), s[].vars))
-sample(rng::AbstractRNG, s::InfiniteSpace, n::Int) = [rand(rng, s) for _ in OneTo(n)]
 
 space(; vars...) = space(keys(vars), values(values(vars)))
 space(names, vars::Tuple{Vararg{DiscreteDistribution}}) = FiniteSpace{names, typeof(vars)}(vars)
@@ -570,7 +550,7 @@ sha_fit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::Allocation
         narms = ceil(Int, n * rate^(i - 1) / i)
 
         loss = nothing
-        parms = sample(space, narms)
+        parms = rand(space, narms)
         arms = map(x -> T(; x...), parms)
 
         @debug "Start successive halving"
