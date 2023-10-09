@@ -31,15 +31,15 @@ restype(x) = restype(typeof(x))
 restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
 restype(x::Type{T}) where T = T
 
-abstract type AbstractResampler{D} end
+abstract type AbstractResampler{T} end
 
-Base.eltype(::Type{R}) where R<:AbstractResampler{D} where D = Tuple{restype(D), restype(D)}
+Base.eltype(::Type{R}) where R<:AbstractResampler{T} where T = Tuple{restype(T), restype(T)}
 
-abstract type MonadicResampler{D} <: AbstractResampler{D} end
-abstract type VariadicResampler{D} <: AbstractResampler{D} end
+abstract type MonadicResampler{T} <: AbstractResampler{T} end
+abstract type VariadicResampler{T} <: AbstractResampler{T} end
 
-struct FixedSplit{D} <: MonadicResampler{D}
-    data::D
+struct FixedSplit{T} <: MonadicResampler{T}
+    data::T
     m::Int
     function FixedSplit(data, m::Int)
         n = nobs(data)
@@ -50,8 +50,8 @@ end
 
 FixedSplit(data, ratio::Real) = FixedSplit(data, floor(Int, nobs(data) * ratio))
 
-struct RandomSplit{D} <: MonadicResampler{D}
-    data::D
+struct RandomSplit{T} <: MonadicResampler{T}
+    data::T
     m::Int
     perm::Vector{Int}
     function RandomSplit(data, m::Int)
@@ -63,8 +63,8 @@ end
 
 RandomSplit(data, ratio::Real) = RandomSplit(data, floor(Int, nobs(data) * ratio))
 
-struct LeaveOneOut{D} <: VariadicResampler{D}
-    data::D
+struct LeaveOneOut{T} <: VariadicResampler{T}
+    data::T
     function LeaveOneOut(data)
         n = nobs(data)
         n > 1 || throw(ArgumentError("data has too few observations to split"))
@@ -72,8 +72,8 @@ struct LeaveOneOut{D} <: VariadicResampler{D}
     end
 end
 
-struct KFold{D} <: VariadicResampler{D}
-    data::D
+struct KFold{T} <: VariadicResampler{T}
+    data::T
     k::Int
     perm::Vector{Int}
     function KFold(data, k::Int)
@@ -83,8 +83,8 @@ struct KFold{D} <: VariadicResampler{D}
     end
 end
 
-struct ForwardChaining{D} <: VariadicResampler{D}
-    data::D
+struct ForwardChaining{T} <: VariadicResampler{T}
+    data::T
     init::Int
     out::Int
     partial::Bool
@@ -97,8 +97,8 @@ struct ForwardChaining{D} <: VariadicResampler{D}
     end
 end
 
-struct SlidingWindow{D} <: VariadicResampler{D}
-    data::D
+struct SlidingWindow{T} <: VariadicResampler{T}
+    data::T
     window::Int
     out::Int
     partial::Bool
