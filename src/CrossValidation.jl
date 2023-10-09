@@ -587,7 +587,7 @@ hyperbandfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResam
 hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
     hyperbandfit(GLOBAL_RNG, T, space, data, budget, rate = rate, maximize = maximize)
 
-@inline function _sasha(T, parms, data, args, temp, maximize)
+@inline function _sasha(rng, T, parms, data, args, temp, maximize)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
@@ -608,7 +608,7 @@ hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budg
 
         @debug "Fitted arms" parms prob loss
 
-        inds = findall(rand(length(prob)) .≤ prob)
+        inds = findall(rand(rng, length(prob)) .≤ prob)
         arms, parms = arms[inds], parms[inds]
 
         n += 1
@@ -618,10 +618,14 @@ hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budg
     return first(arms), first(parms)
 end
 
+sasha(rng::AbstractRNG, T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+    _sasha(rng, T, parms, data, args, temp, maximize)[2]
 sasha(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
-    _sasha(T, parms, data, args, temp, maximize)[2]
+    sasha(GLOBAL_RNG, T, parms, data, args = args, temp = temp, maximize = maximize)
 
+sashafit(rng::AbstractRNG, T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+    _sasha(rng, T, parms, data, args, temp, maximize)[1]
 sashafit(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
-    _sasha(T, parms, data, args, temp, maximize)[1]
+    sashafit(GLOBAL_RNG, T, parms, data, args = args, temp = temp, maximize = maximize)
 
 end
