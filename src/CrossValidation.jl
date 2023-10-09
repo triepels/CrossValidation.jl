@@ -384,7 +384,7 @@ function brute(T::Type, parms, data::AbstractResampler; args = (), maximize::Boo
     return parms[ind]
 end
 
-function brute_fit(T::Type, parms, data::MonadicResampler; args = (), maximize::Bool = false)
+function brutefit(T::Type, parms, data::MonadicResampler; args = (), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     train, val = first(data)
