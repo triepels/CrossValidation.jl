@@ -261,13 +261,14 @@ upperbound(d::Uniform) = d.b
 upperbound(d::LogUniform) = d.b
 upperbound(d::Normal) = d.b
 
-abstract type AbstractSpace{names} end
+abstract type AbstractSpace{names, T<:Tuple} end
 
-struct FiniteSpace{names, T<:Tuple} <: AbstractSpace{names}
+Base.eltype(::Type{S}) where S<:AbstractSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
+
+struct FiniteSpace{names, T} <: AbstractSpace{names, T}
     vars::T
 end
 
-Base.eltype(::Type{S}) where S<:FiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
 Base.firstindex(s::FiniteSpace) = 1
 Base.keys(s::FiniteSpace) = OneTo(length(s))
 Base.lastindex(s::FiniteSpace) = length(s)
@@ -294,14 +295,11 @@ end
     return s[state], state + 1
 end
 
-rand(rng::AbstractRNG, s::SamplerTrivial{FiniteSpace{names, T}}) where {names, T} = NamedTuple{names}(map(x -> rand(rng, x), s[].vars))
-
-struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace{names}
+struct InfiniteSpace{names, T} <: AbstractSpace{names, T}
     vars::T
 end
 
-Base.eltype(::Type{S}) where S<:InfiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
-
+rand(rng::AbstractRNG, s::SamplerTrivial{FiniteSpace{names, T}}) where {names, T} = NamedTuple{names}(map(x -> rand(rng, x), s[].vars))
 rand(rng::AbstractRNG, s::SamplerTrivial{InfiniteSpace{names, T}}) where {names, T} = NamedTuple{names}(map(x -> rand(rng, x), s[].vars))
 
 space(; vars...) = space(keys(vars), values(values(vars)))
