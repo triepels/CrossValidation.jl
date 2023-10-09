@@ -380,7 +380,7 @@ end
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution, at, step)
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution, at, step::T) where T<:Int
     @boundscheck at ∈ values(d) || throw(BoundsError(d, at))
     ind = findfirst(values(d) .== at)
     a, b = max(lowerbound(d), ind - abs(step)), min(ind + abs(step), upperbound(d))
