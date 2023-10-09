@@ -375,30 +375,30 @@ function brutefit(T::Type, parms, data::MonadicResampler; args = (), maximize::B
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-function neighbors(rng::AbstractRNG, d::DiscreteDistribution{T}, at::T, step::T) where T<:Int
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution{T}, at::T, step::T) where T<:Int
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
     a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
-    return @inbounds rand(rng, a:b)
+    return rand(rng, a:b)
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-function neighbors(rng::AbstractRNG, d::DiscreteDistribution, at, step)
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution, at, step)
     @boundscheck at ∈ values(d) || throw(BoundsError(d, at))
     at = findfirst(values(d) .== at)
-    return @inbounds d[rand(rng, max(lowerbound(d), at - step):min(at + step, upperbound(d)))]
+    return d[rand(rng, max(lowerbound(d), at - step):min(at + step, upperbound(d)))]
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-function neighbors(rng::AbstractRNG, d::ContinousDistribution{T}, at::T, step::Real) where T
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::ContinousDistribution{T}, at::T, step::Real) where T
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
     a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
     return (b - a) * rand(rng, T) + a
 end
 
-neighbors(rng::AbstractRNG, d::AbstractDistribution, at, step, n::Int) = [neighbors(rng, d, at, step) for _ in OneTo(n)]
+@propagate_inbounds neighbors(rng::AbstractRNG, d::AbstractDistribution, at, step, n::Int) = [neighbors(rng, d, at, step) for _ in OneTo(n)]
 
-neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at, step) where names = NamedTuple{names}(neighbors.(rng, s.vars, at, step))
-neighbors(rng::AbstractRNG, s::AbstractSpace, at, step, n::Int) = [neighbors(rng, s, at, step) for _ in 1:n]
+@propagate_inbounds neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at, step) where names = NamedTuple{names}(neighbors.(rng, s.vars, at, step))
+@propagate_inbounds neighbors(rng::AbstractRNG, s::AbstractSpace, at, step, n::Int) = [neighbors(rng, s, at, step) for _ in 1:n]
 
 function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResampler, step; args = (), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
@@ -408,7 +408,7 @@ function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResam
 
     nbrs = rand(rng, space, n)
     @debug "Start hill-climbing"
-    while !isempty(nbrs)
+    @inbounds while !isempty(nbrs)
         loss = _val(T, nbrs, data, args)
         if maximize
             i = argmax(loss)
@@ -438,7 +438,7 @@ function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicRes
     
     nbrs = rand(rng, space, n)
     @debug "Start hill-climbing"
-    while !isempty(nbrs)
+    @inbounds while !isempty(nbrs)
         models, loss = _fit_split(T, nbrs, train, val, args)
         if maximize
             i = argmax(loss)
@@ -475,12 +475,12 @@ const GeometricAllocation = AllocationMode{:Geometric}()
 const ConstantAllocation = AllocationMode{:Constant}()
 const HyperbandAllocation = AllocationMode{:Hyperband}()
 
-function allocate(budget::Budget, mode::AllocationMode, narms::Int, rate::Real)
+@propagate_inbounds function allocate(budget::Budget, mode::AllocationMode, narms::Int, rate::Real)
     nrounds = floor(Int, log(rate, narms)) + 1
     return allocate(budget, mode, nrounds, narms, rate)
 end
 
-function allocate(budget::Budget{name, T}, mode::AllocationMode{:Geometric}, nrounds::Int, narms::Int, rate::Real) where {name, T}
+@propagate_inbounds function allocate(budget::Budget{name, T}, mode::AllocationMode{:Geometric}, nrounds::Int, narms::Int, rate::Real) where {name, T}
     arms = Vector{Int}(undef, nrounds)
     args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
     for i in OneTo(nrounds)
@@ -491,7 +491,7 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Geometric}, nro
     return zip(arms, args)
 end
 
-function allocate(budget::Budget{name, T}, mode::AllocationMode{:Constant}, nrounds::Int, narms::Int, rate::Real) where {name, T}
+@propagate_inbounds function allocate(budget::Budget{name, T}, mode::AllocationMode{:Constant}, nrounds::Int, narms::Int, rate::Real) where {name, T}
     arms = Vector{Int}(undef, nrounds)
     args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
     c = (rate - 1) * rate^(nrounds - 1) / (narms * (rate^nrounds - 1))
@@ -502,7 +502,7 @@ function allocate(budget::Budget{name, T}, mode::AllocationMode{:Constant}, nrou
     return zip(arms, args)
 end
 
-function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nrounds::Int, narms::Int, rate::Real) where {name, T}
+@propagate_inbounds function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nrounds::Int, narms::Int, rate::Real) where {name, T}
     arms = Vector{Int}(undef, nrounds)
     args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
     for i in OneTo(nrounds)
@@ -521,7 +521,7 @@ end
     arms = map(x -> T(; x...), parms)
 
     @debug "Start successive halving"
-    for (k, args) in allocate(budget, mode, length(arms), rate)
+    @inbounds for (k, args) in allocate(budget, mode, length(arms), rate)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, val), arms)
         @debug "Fitted arms" parms args loss
@@ -549,7 +549,7 @@ shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationM
     n = floor(Int, log(rate, budget.val)) + 1
 
     @debug "Start hyperband"
-    for i in reverse(OneTo(n))
+    @inbounds for i in reverse(OneTo(n))
         narms = ceil(Int, n * rate^(i - 1) / i)
 
         loss = nothing
@@ -599,7 +599,7 @@ hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budg
 
     n = 1
     @debug "Start SASHA"
-    while length(arms) > 1
+    @inbounds while length(arms) > 1
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, test), arms)
 
