@@ -43,16 +43,16 @@ hc(MyModel, sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
 hcfit(MyModel, sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
 
 sha(MyModel, sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
-sha_fit(MyModel, sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
+shafit(MyModel, sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
 
 sha(MyModel, rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
-sha_fit(MyModel, rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
+shafit(MyModel, rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
 
 hyperband(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
-hyperband_fit(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
+hyperbandfit(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
 
 sasha(MyModel, sp, data, args = (epochs = 1,), temp = 1, maximize = false)
-sasha_fit(MyModel, sp, data, args = (epochs = 1,), temp = 1, maximize = false)
+sashafit(MyModel, sp, data, args = (epochs = 1,), temp = 1, maximize = false)
 
 validate(KFold(x, 10)) do train
     parm = brute(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), maximize = false)
@@ -83,9 +83,9 @@ validate(KFold(x, 10)) do train
 end
 
 validate(KFold(x, 10)) do train
-    return sha_fit(MyModel, sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
+    return shafit(MyModel, sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
 end
 
 validate(KFold(x, 10)) do train
-    return sasha_fit(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
+    return sashafit(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
 end

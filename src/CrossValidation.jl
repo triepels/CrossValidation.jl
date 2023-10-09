@@ -10,7 +10,7 @@ export AbstractResampler, MonadicResampler, VariadicResampler, FixedSplit, Rando
        AbstractSpace, FiniteSpace, InfiniteSpace, space,
        AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal,
        Budget, AllocationMode, GeometricAllocation, ConstantAllocation, HyperbandAllocation, allocate,
-       fit!, loss, validate, brute, brutefit, hc, hcfit, sha, sha_fit, hyperband, hyperband_fit, sasha, sasha_fit
+       fit!, loss, validate, brute, brutefit, hc, hcfit, sha, shafit, hyperband, hyperbandfit, sasha, sashafit
 
 nobs(x::AbstractArray) = size(x)[end]
 nobs(x) = length(x)
@@ -533,7 +533,7 @@ end
 sha(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     _sha(T, parms, data, budget, mode, rate, maximize)[2]
 
-sha_fit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     _sha(T, parms, data, budget, mode, rate, maximize)[1]
 
 @inline function _hyperband(T, space, data, budget, rate, maximize)
@@ -579,7 +579,7 @@ end
 
 hyperband(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
     _hyperband(T, space, data, budget, rate, maximize)[2]
-hyperband_fit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
     _hyperband(T, space, data, budget, rate, maximize)[1]
  
 @inline function _sasha(T, parms, data, args, temp, maximize)
@@ -616,7 +616,7 @@ end
 sasha(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
     _sasha(T, parms, data, args, temp, maximize)[2]
 
-sasha_fit(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+sashafit(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
     _sasha(T, parms, data, args, temp, maximize)[1]
 
 end
