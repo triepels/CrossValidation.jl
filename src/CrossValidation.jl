@@ -31,12 +31,12 @@ restype(x) = restype(typeof(x))
 restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
 restype(x::Type{T}) where T = T
 
-abstract type AbstractResampler end
-abstract type MonadicResampler{D} <: AbstractResampler end
-abstract type VariadicResampler{D} <: AbstractResampler end
+abstract type AbstractResampler{D} end
 
-Base.eltype(::Type{R}) where R<:MonadicResampler{D} where D = Tuple{restype(D), restype(D)}
-Base.eltype(::Type{R}) where R<:VariadicResampler{D} where D = Tuple{restype(D), restype(D)}
+Base.eltype(::Type{R}) where R<:AbstractResampler{D} where D = Tuple{restype(D), restype(D)}
+
+abstract type MonadicResampler{D} <: AbstractResampler{D} end
+abstract type VariadicResampler{D} <: AbstractResampler{D} end
 
 struct FixedSplit{D} <: MonadicResampler{D}
     data::D
