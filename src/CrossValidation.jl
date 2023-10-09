@@ -172,10 +172,12 @@ end
 end
 
 abstract type AbstractDistribution{T} end
+
+Base.eltype(::Type{D}) where D<:AbstractDistribution{T} where T = T
+
 abstract type DiscreteDistribution{T} <: AbstractDistribution{T} end
 abstract type ContinousDistribution{T<:AbstractFloat} <: AbstractDistribution{T} end
 
-Base.eltype(::Type{D}) where D<:AbstractDistribution{T} where T = T
 Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
 Base.iterate(d::DiscreteDistribution) = iterate(values(d))
 Base.iterate(d::DiscreteDistribution, state) = iterate(values(d), state)
