@@ -220,20 +220,6 @@ end
 Base.values(d::Discrete) = d.vals
 Base.values(d::DiscreteUniform) = d.vals
 
-function rand(rng::AbstractRNG, d::Discrete)
-    c = zero(P)
-    q = rand(rng)
-    for (state, p) in zip(d.vals, d.probs)
-        c += p
-        if q < c
-            return state
-        end
-    end
-    return last(d.vals)
-end
-
-rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.vals)
-
 struct Uniform{T<:AbstractFloat} <: ContinousDistribution{T}
     a::Float64
     b::Float64
@@ -284,8 +270,19 @@ rand(rng::AbstractRNG, d::SamplerTrivial{Uniform{T}}) where T = T(d[].a + (d[].b
 rand(rng::AbstractRNG, d::SamplerTrivial{LogUniform{T}}) where T = T(exp(log(d[].a) + (log(d[].b) - log(d[].a)) * rand(rng, T)))
 rand(rng::AbstractRNG, d::SamplerTrivial{Normal{T}}) where T = T(d[].mean + d[].std * randn(rng, T))
 
+lowerbound(d::DiscreteDistribution) = 1
+lowerbound(d::Uniform) = d.a
+lowerbound(d::LogUniform) = d.a
+lowerbound(d::Normal) = d.a
 
-struct FiniteSpace{names, T<:Tuple} <: AbstractSpace
+upperbound(d::DiscreteDistribution) = length(d)
+upperbound(d::Uniform) = d.b
+upperbound(d::LogUniform) = d.b
+upperbound(d::Normal) = d.b
+
+abstract type AbstractSpace{names} end
+
+struct FiniteSpace{names, T<:Tuple} <: AbstractSpace{names}
     vars::T
 end
 
@@ -318,7 +315,7 @@ end
 
 rand(rng::AbstractRNG, s::SamplerTrivial{FiniteSpace{names, T}}) where {names, T} = NamedTuple{names}(map(x -> rand(rng, x), s[].vars))
 
-struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
+struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace{names}
     vars::T
 end
 
@@ -397,68 +394,40 @@ function brutefit(T::Type, parms, data::MonadicResampler; args = (), maximize::B
     return models[ind]
 end
 
-function _neighbors(space, ref, k, bl)
-    dim = size(space)
-    inds = sizehint!(Int[], sum(min.(dim .- 1, 2 * k)))
-    @inbounds for i in eachindex(dim)
-        if i == 1
-            d = mod(ref - 1, dim[1]) + 1
-            for j in reverse(OneTo(k))
-                if d - j ≥ 1
-                    ind = ref - j
-                    if ind ∉ bl
-                        push!(inds, ind)
-                    end
-                end
-            end
-            for j in OneTo(k)
-                if d + j ≤ dim[1]
-                    ind = ref + j
-                    if ind ∉ bl
-                        push!(inds, ind)
-                    end
-                end
-            end
-        else
-            d = mod((ref - 1) ÷ dim[i - 1], dim[i]) + 1
-            for j in reverse(OneTo(k))
-                if d - j ≥ 1
-                    ind = ref - j * dim[i - 1]
-                    if ind ∉ bl
-                        push!(inds, ind)
-                    end
-                end
-            end
-            for j in OneTo(k)
-                if d + j ≤ dim[i]
-                    ind = ref + j * dim[i - 1]
-                    if ind ∉ bl
-                        push!(inds, ind)
-                    end
-                end
-            end
-        end
-    end
-    return inds
+# TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
+function neighbors(rng::AbstractRNG, d::DiscreteDistribution{T}, at::T, step::T) where T<:Int
+    @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
+    return @inbounds rand(rng, max(lowerbound(d), at - step):min(at + step, upperbound(d)))
 end
 
-function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
-    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
+# TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
+function neighbors(rng::AbstractRNG, d::DiscreteDistribution, at, step)
+    @boundscheck at ∈ values(d) || throw(BoundsError(d, at))
+    at = findfirst(values(d) .== at)
+    return @inbounds d[rand(rng, max(lowerbound(d), at - step):min(at + step, upperbound(d)))]
+end
 
-    bl = Int[]
+# TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
+function neighbors(rng::AbstractRNG, d::ContinousDistribution{T}, at::T, step::Real) where T
+    @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
+    return (min(at + step, upperbound(d)) - max(lowerbound(d), at - step)) * rand(rng, T) + max(lowerbound(d), at - step)
+end
+
+neighbors(rng::AbstractRNG, d::AbstractDistribution, at, step, n::Int) = [neighbors(rng, d, at, step) for _ in OneTo(n)]
+
+neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at, step) where names = NamedTuple{names}(neighbors.(rng, s.vars, at, step))
+neighbors(rng::AbstractRNG, s::AbstractSpace, at, step, n::Int) = [neighbors(rng, s, at, step) for _ in 1:n]
+
+function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResampler, step; args = (), n::Int = 1, maximize::Bool = false)
+    n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
+
     parm = nothing
     best = maximize ? -Inf : Inf
 
-    cand = sample(OneTo(length(space)), nstart)
-
+    nbrs = rand(rng, space, n)
     @debug "Start hill-climbing"
-    while !isempty(cand)
-        append!(bl, cand)
-
-        parms = space[cand]
-        loss = _val(T, parms, data, args)
-
+    while !isempty(nbrs)
+        loss = _val(T, nbrs, data, args)
         if maximize
             i = argmax(loss)
             loss[i] > best || break
@@ -466,32 +435,28 @@ function hc(T::Type, space::FiniteSpace, data::AbstractResampler; args = (), nst
             i = argmin(loss)
             loss[i] < best || break
         end
-
-        parm, best = parms[i], loss[i]
-        cand = _neighbors(space, cand[i], k, bl)
+        parm, best = nbrs[i], loss[i]
+        nbrs = neighbors(rng, space, values(parm), step, n)
     end
     @debug "Finished hill-climbing"
 
     return parm
 end
 
-function hc_fit(T::Type, space::FiniteSpace, data::MonadicResampler; args = (), nstart::Int = 1, k::Int = 1, maximize::Bool = false)
-    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    k ≥ 1 || throw(ArgumentError("invalid neighborhood size of $k"))
+hc(T::Type, space::AbstractSpace, data::AbstractResampler, step; args = (), n::Int = 1, maximize::Bool = false) =
+    hc(GLOBAL_RNG, T, space, data, step, args = args, n = n, maximize = maximize)
 
-    bl = Int[]
+function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResampler, step; args = (), n::Int = 1, maximize::Bool = false)
+    n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
+
     model = nothing
     best = maximize ? -Inf : Inf
 
     train, val = first(data)
-    cand = sample(OneTo(length(space)), nstart)
-
+    nbrs = rand(rng, space, n)
     @debug "Start hill-climbing"
-    while !isempty(cand)
-        append!(bl, cand)
-
-        models, loss = _fit_split(T, space[cand], train, val, args)
-
+    while !isempty(nbrs)
+        models, loss = _fit_split(T, nbrs, train, val, args)
         if maximize
             i = argmax(loss)
             loss[i] > best || break
@@ -499,14 +464,16 @@ function hc_fit(T::Type, space::FiniteSpace, data::MonadicResampler; args = (), 
             i = argmin(loss)
             loss[i] < best || break
         end
-
         model, best = models[i], loss[i]
-        cand = _neighbors(space, cand[i], k, bl)
+        nbrs = neighbors(rng, space, values(nbrs[i]), step, n)
     end
     @debug "Finished hill-climbing"
 
     return model
 end
+
+hcfit(T::Type, space::AbstractSpace, data::MonadicResampler, step; args = (), n::Int = 1, maximize::Bool = false) =
+    hcfit(GLOBAL_RNG, T, space, data, step, args = args, n = n, maximize = maximize)
 
 struct Budget{name, T<:Real}
     val::T
