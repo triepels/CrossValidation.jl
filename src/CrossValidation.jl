@@ -536,7 +536,7 @@ sha(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode
 shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
     _sha(T, parms, data, budget, mode, rate, maximize)[1]
 
-@inline function _hyperband(T, space, data, budget, rate, maximize)
+@inline function _hyperband(rng, T, space, data, budget, rate, maximize)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     arm, parm = nothing, nothing
@@ -550,7 +550,7 @@ shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationM
         narms = ceil(Int, n * rate^(i - 1) / i)
 
         loss = nothing
-        parms = rand(space, narms)
+        parms = rand(rng, space, narms)
         arms = map(x -> T(; x...), parms)
 
         @debug "Start successive halving"
@@ -577,11 +577,16 @@ shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationM
     return arm, parm
 end
 
+hyperband(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+    _hyperband(rng, T, space, data, budget, rate, maximize)[2]
 hyperband(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    _hyperband(T, space, data, budget, rate, maximize)[2]
+    hyperband(GLOBAL_RNG, T, space, data, budget, rate = rate, maximize = maximize)
+
+hyperbandfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+    _hyperband(rng, T, space, data, budget, rate, maximize)[1]
 hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    _hyperband(T, space, data, budget, rate, maximize)[1]
- 
+    hyperbandfit(GLOBAL_RNG, T, space, data, budget, rate = rate, maximize = maximize)
+
 @inline function _sasha(T, parms, data, args, temp, maximize)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
