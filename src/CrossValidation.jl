@@ -1,7 +1,7 @@
 module CrossValidation
 
 using Base: @propagate_inbounds, OneTo
-using Random: GLOBAL_RNG, AbstractRNG, shuffle!
+using Random: GLOBAL_RNG, AbstractRNG, SamplerTrivial, shuffle!
 using Distributed: pmap
 
 import Random: rand
@@ -267,11 +267,23 @@ end
 
 Normal(mean::Real, std::Real) = Normal{Float64}(mean, std)
 
-rand(rng::AbstractRNG, d::Uniform{T}) where T = T(d.a + (d.b - d.a) * rand(rng, T))
-rand(rng::AbstractRNG, d::LogUniform{T}) where T = T(exp(log(d.a) + (log(d.b) - log(d.a)) * rand(rng, T)))
-rand(rng::AbstractRNG, d::Normal{T}) where T = T(d.mean + d.std * randn(rng, T))
+function rand(rng::AbstractRNG, d::Discrete)
+    c = zero(P)
+    q = rand(rng)
+    for (state, p) in zip(d.vals, d.probs)
+        c += p
+        if q < c
+            return state
+        end
+    end
+    return last(d.vals)
+end
 
-abstract type AbstractSpace end
+rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.vals)
+rand(rng::AbstractRNG, d::SamplerTrivial{Uniform{T}}) where T = T(d[].a + (d[].b - d[].a) * rand(rng, T))
+rand(rng::AbstractRNG, d::SamplerTrivial{LogUniform{T}}) where T = T(exp(log(d[].a) + (log(d[].b) - log(d[].a)) * rand(rng, T)))
+rand(rng::AbstractRNG, d::SamplerTrivial{Normal{T}}) where T = T(d[].mean + d[].std * randn(rng, T))
+
 
 struct FiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
@@ -304,7 +316,7 @@ end
     return s[state], state + 1
 end
 
-rand(rng::AbstractRNG, s::FiniteSpace{names}) where names = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
+rand(rng::AbstractRNG, s::SamplerTrivial{FiniteSpace{names, T}}) where {names, T} = NamedTuple{names}(map(x -> rand(rng, x), s[].vars))
 
 struct InfiniteSpace{names, T<:Tuple} <: AbstractSpace
     vars::T
@@ -312,7 +324,7 @@ end
 
 Base.eltype(::Type{S}) where S<:InfiniteSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
 
-rand(rng::AbstractRNG, s::InfiniteSpace{names}) where names = NamedTuple{names}(map(x -> rand(rng, x), s.vars))
+rand(rng::AbstractRNG, s::SamplerTrivial{InfiniteSpace{names, T}}) where {names, T} = NamedTuple{names}(map(x -> rand(rng, x), s[].vars))
 sample(rng::AbstractRNG, s::InfiniteSpace, n::Int) = [rand(rng, s) for _ in OneTo(n)]
 
 space(; vars...) = space(keys(vars), values(values(vars)))
