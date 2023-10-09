@@ -377,7 +377,8 @@ end
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
 function neighbors(rng::AbstractRNG, d::DiscreteDistribution{T}, at::T, step::T) where T<:Int
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
-    return @inbounds rand(rng, max(lowerbound(d), at - step):min(at + step, upperbound(d)))
+    a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
+    return @inbounds rand(rng, a:b)
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
@@ -390,7 +391,8 @@ end
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
 function neighbors(rng::AbstractRNG, d::ContinousDistribution{T}, at::T, step::Real) where T
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
-    return (min(at + step, upperbound(d)) - max(lowerbound(d), at - step)) * rand(rng, T) + max(lowerbound(d), at - step)
+    a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
+    return (b - a) * rand(rng, T) + a
 end
 
 neighbors(rng::AbstractRNG, d::AbstractDistribution, at, step, n::Int) = [neighbors(rng, d, at, step) for _ in OneTo(n)]
