@@ -173,7 +173,7 @@ end
 
 abstract type AbstractDistribution{T} end
 abstract type DiscreteDistribution{T} <: AbstractDistribution{T} end
-abstract type ContinousDistribution{T} <: AbstractDistribution{T} end
+abstract type ContinousDistribution{T<:AbstractFloat} <: AbstractDistribution{T} end
 
 Base.eltype(::Type{D}) where D<:AbstractDistribution{T} where T = T
 Base.getindex(d::DiscreteDistribution, i) = getindex(values(d), i)
@@ -201,7 +201,7 @@ end
 Base.values(d::Discrete) = d.vals
 Base.values(d::DiscreteUniform) = d.vals
 
-struct Uniform{T<:AbstractFloat} <: ContinousDistribution{T}
+struct Uniform{T} <: ContinousDistribution{T}
     a::Float64
     b::Float64
     function Uniform{T}(a::Real, b::Real) where T<:AbstractFloat
@@ -212,7 +212,7 @@ end
 
 Uniform(a::Real, b::Real) = Uniform{Float64}(a, b)
 
-struct LogUniform{T<:AbstractFloat} <: ContinousDistribution{T}
+struct LogUniform{T} <: ContinousDistribution{T}
     a::Float64
     b::Float64
     function LogUniform{T}(a::Real, b::Real) where T<:AbstractFloat
@@ -223,7 +223,7 @@ end
 
 LogUniform(a::Real, b::Real) = LogUniform{Float64}(a, b)
 
-struct Normal{T<:AbstractFloat} <: ContinousDistribution{T}
+struct Normal{T} <: ContinousDistribution{T}
     mean::Float64
     std::Float64
     function Normal{T}(mean::Real, std::Real) where T<:AbstractFloat
