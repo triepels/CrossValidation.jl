@@ -10,7 +10,7 @@ export AbstractResampler, MonadicResampler, VariadicResampler, FixedSplit, Rando
        AbstractSpace, FiniteSpace, InfiniteSpace, space,
        AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal, sample,
        Budget, AllocationMode, GeometricAllocation, ConstantAllocation, HyperbandAllocation, allocate,
-       fit!, loss, validate, brute, brute_fit, hc, hc_fit, sha, sha_fit, hyperband, hyperband_fit, sasha, sasha_fit
+       fit!, loss, validate, brute, brutefit, hc, hcfit, sha, sha_fit, hyperband, hyperband_fit, sasha, sasha_fit
 
 nobs(x::AbstractArray) = size(x)[end]
 nobs(x) = length(x)
