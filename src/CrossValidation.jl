@@ -348,7 +348,7 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(T::Type, parms, data::AbstractResampler; args = (), maximize::Bool = false)
+function brute(T::Type, parms, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     @debug "Start brute-force search"
@@ -359,7 +359,7 @@ function brute(T::Type, parms, data::AbstractResampler; args = (), maximize::Boo
     return parms[ind]
 end
 
-function brutefit(T::Type, parms, data::MonadicResampler; args = (), maximize::Bool = false)
+function brutefit(T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     train, val = first(data)
@@ -399,7 +399,7 @@ end
 @propagate_inbounds neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at, step) where names = NamedTuple{names}(neighbors.(rng, s.vars, at, step))
 @propagate_inbounds neighbors(rng::AbstractRNG, s::AbstractSpace, at, step, n::Int) = [neighbors(rng, s, at, step) for _ in 1:n]
 
-function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResampler, step; args = (), n::Int = 1, maximize::Bool = false)
+function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
 
     parm = nothing
@@ -424,10 +424,10 @@ function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResam
     return parm
 end
 
-hc(T::Type, space::AbstractSpace, data::AbstractResampler, step; args = (), n::Int = 1, maximize::Bool = false) =
+hc(T::Type, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
     hc(GLOBAL_RNG, T, space, data, step, args = args, n = n, maximize = maximize)
 
-function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResampler, step; args = (), n::Int = 1, maximize::Bool = false)
+function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
 
     model = nothing
@@ -454,7 +454,7 @@ function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicRes
     return model
 end
 
-hcfit(T::Type, space::AbstractSpace, data::MonadicResampler, step; args = (), n::Int = 1, maximize::Bool = false) =
+hcfit(T::Type, space::AbstractSpace, data::MonadicResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
     hcfit(GLOBAL_RNG, T, space, data, step, args = args, n = n, maximize = maximize)
 
 struct Budget{name, T<:Real}
@@ -620,14 +620,14 @@ hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budg
     return first(arms), first(parms)
 end
 
-sasha(rng::AbstractRNG, T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+sasha(rng::AbstractRNG, T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
     _sasha(rng, T, parms, data, args, temp, maximize)[2]
-sasha(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+sasha(T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
     sasha(GLOBAL_RNG, T, parms, data, args = args, temp = temp, maximize = maximize)
 
-sashafit(rng::AbstractRNG, T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+sashafit(rng::AbstractRNG, T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
     _sasha(rng, T, parms, data, args, temp, maximize)[1]
-sashafit(T::Type, parms, data::MonadicResampler; args = (), temp::Real = 1, maximize::Bool = false) =
+sashafit(T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
     sashafit(GLOBAL_RNG, T, parms, data, args = args, temp = temp, maximize = maximize)
 
 end
