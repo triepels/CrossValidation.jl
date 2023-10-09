@@ -433,6 +433,7 @@ function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicRes
     best = maximize ? -Inf : Inf
 
     train, val = first(data)
+    
     nbrs = rand(rng, space, n)
     @debug "Start hill-climbing"
     while !isempty(nbrs)
