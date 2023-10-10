@@ -209,7 +209,7 @@ struct Uniform{T} <: ContinousDistribution{T}
     a::T
     b::T
     function Uniform(a::Real, b::Real)
-        a, b = promote(a, b)
+        a, b = promote(float(a), float(b))
         a < b || throw(ArgumentError("a must be smaller than b"))
         return new{typeof(a)}(a, b)
     end
@@ -219,7 +219,7 @@ struct LogUniform{T} <: ContinousDistribution{T}
     a::T
     b::T
     function LogUniform(a::Real, b::Real)
-        a, b = promote(a, b)
+        a, b = promote(float(a), float(b))
         a < b || throw(ArgumentError("a must be smaller than b"))
         return new{typeof(a)}(a, b)
     end
@@ -229,7 +229,7 @@ struct Normal{T} <: ContinousDistribution{T}
     mean::T
     std::T
     function Normal(mean::Real, std::Real)
-        mean, std = promote(mean, std)
+        mean, std = promote(float(mean), float(std))
         std > zero(std) || throw(ArgumentError("standard deviation must be larger than zero"))
         return new{typeof(mean)}(mean, std)
     end
