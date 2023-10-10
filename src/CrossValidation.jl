@@ -558,9 +558,8 @@ shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationM
 
     @debug "Start hyperband"
     @inbounds for i in reverse(OneTo(n))
-        narms = ceil(Int, n * rate^(i - 1) / i)
-
         loss = nothing
+        narms = ceil(Int, n * rate^(i - 1) / i)
         parms = rand(rng, space, narms)
         arms = map(x -> T(; x...), parms)
 
