@@ -187,6 +187,7 @@ struct Discrete{T} <: DiscreteDistribution{T}
     vals::Vector{T}
     probs::Vector{Float64}
     function Discrete(vals::V, probs::Vector{P}) where {V, P<:Real}
+        length(vals) ≥ 1 || throw(ArgumentError("no values provided"))
         length(vals) == length(probs) || throw(ArgumentError("lenghts of values and probabilities do not match"))
         (all(probs .≥ 0) && isapprox(sum(probs), 1)) || throw(ArgumentError("invalid probabilities provided"))
         return new{eltype(V)}(vals, probs)
