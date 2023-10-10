@@ -255,12 +255,12 @@ rand(rng::AbstractRNG, d::SamplerTrivial{Normal{T}}) where T = T(d[].mean + d[].
 lowerbound(d::DiscreteDistribution) = 1
 lowerbound(d::Uniform) = d.a
 lowerbound(d::LogUniform) = d.a
-lowerbound(d::Normal) = d.a
+lowerbound(d::Normal) = -Inf
 
 upperbound(d::DiscreteDistribution) = length(d)
 upperbound(d::Uniform) = d.b
 upperbound(d::LogUniform) = d.b
-upperbound(d::Normal) = d.b
+upperbound(d::Normal) = Inf
 
 abstract type AbstractSpace{names, T<:Tuple} end
 
