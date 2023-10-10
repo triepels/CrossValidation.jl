@@ -92,7 +92,7 @@ struct ForwardChaining{T} <: VariadicResampler{T}
         n = nobs(data)
         1 ≤ init ≤ n || throw(ArgumentError("invalid initial window of $init"))
         1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
-        init + out ≤ n || throw(ArgumentError("initial and out-of-sample window exceed number of data observations"))
+        init + out ≤ n || throw(ArgumentError("initial and out-of-sample window exceed number of observations"))
         return new{typeof(data)}(data, init, out, partial)
     end
 end
@@ -106,7 +106,7 @@ struct SlidingWindow{T} <: VariadicResampler{T}
         n = nobs(data)
         1 ≤ window ≤ n || throw(ArgumentError("invalid sliding window of $window"))
         1 ≤ out ≤ n || throw(ArgumentError("invalid out-of-sample window of $out"))
-        window + out ≤ n || throw(ArgumentError("sliding and out-of-sample window exceed number of data observations"))
+        window + out ≤ n || throw(ArgumentError("sliding and out-of-sample window exceed number of observations"))
         return new{typeof(data)}(data, window, out, partial)
     end
 end
