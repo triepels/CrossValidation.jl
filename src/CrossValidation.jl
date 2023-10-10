@@ -473,9 +473,9 @@ struct Budget{name, T<:Real}
     end
 end
 
-_cast(::Type{T}, x::Real, r) where T <: Real = T(x)
-_cast(::Type{T}, x::AbstractFloat, r) where T <: Integer = round(T, x, r)
-_cast(::Type{T}, x::T, r) where T <: Real = x
+_cast(::Type{T}, x::Real, r) where T<:Real = T(x)
+_cast(::Type{T}, x::AbstractFloat, r) where T<:Integer = round(T, x, r)
+_cast(::Type{T}, x::T, r) where T<:Real = x
 
 struct AllocationMode{M} end
 
