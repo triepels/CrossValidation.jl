@@ -206,37 +206,34 @@ Base.values(d::Discrete) = d.vals
 Base.values(d::DiscreteUniform) = d.vals
 
 struct Uniform{T} <: ContinousDistribution{T}
-    a::Float64
-    b::Float64
-    function Uniform{T}(a::Real, b::Real) where T<:AbstractFloat
+    a::T
+    b::T
+    function Uniform(a::Real, b::Real)
+        a, b = promote(a, b)
         a < b || throw(ArgumentError("a must be smaller than b"))
-        return new{T}(a, b)
+        return new{typeof(a)}(a, b)
     end
 end
-
-Uniform(a::Real, b::Real) = Uniform{Float64}(a, b)
 
 struct LogUniform{T} <: ContinousDistribution{T}
-    a::Float64
-    b::Float64
-    function LogUniform{T}(a::Real, b::Real) where T<:AbstractFloat
+    a::T
+    b::T
+    function LogUniform(a::Real, b::Real)
+        a, b = promote(a, b)
         a < b || throw(ArgumentError("a must be smaller than b"))
-        return new{T}(a, b)
+        return new{typeof(a)}(a, b)
     end
 end
-
-LogUniform(a::Real, b::Real) = LogUniform{Float64}(a, b)
 
 struct Normal{T} <: ContinousDistribution{T}
-    mean::Float64
-    std::Float64
-    function Normal{T}(mean::Real, std::Real) where T<:AbstractFloat
+    mean::T
+    std::T
+    function Normal(mean::Real, std::Real)
+        mean, std = promote(mean, std)
         std > zero(std) || throw(ArgumentError("standard deviation must be larger than zero"))
-        return new{T}(mean, std)
+        return new{typeof(mean)}(mean, std)
     end
 end
-
-Normal(mean::Real, std::Real) = Normal{Float64}(mean, std)
 
 function rand(rng::AbstractRNG, d::Discrete)
     c = zero(P)
