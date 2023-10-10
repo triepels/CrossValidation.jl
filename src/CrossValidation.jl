@@ -196,6 +196,7 @@ end
 struct DiscreteUniform{T} <: DiscreteDistribution{T}
     vals::Vector{T}
     function DiscreteUniform(vals::V) where V
+        length(vals) ≥ 1 || throw(ArgumentError("no values provided"))
         return new{eltype(V)}(vals)
     end
 end
