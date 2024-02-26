@@ -317,19 +317,19 @@ _loss(model, x) = loss(model, x)
 
 loss(model, x) = throw(MethodError(loss, (model, x)))
 
-@inline function _val(T, parms, data, args)
-    return sum(x -> _val_split(T, parms, x..., args), data) / length(data)
+@inline function _val(f, parms, data, args)
+    return sum(x -> _val_split(f, parms, x..., args), data) / length(data)
 end
 
-@inline function _val_split(T, parms, train, test, args)
-    models = pmap(x -> _fit!(T(; x...), train, args), parms)
+@inline function _val_split(f, parms, train, test, args)
+    models = pmap(x -> _fit!(x, train, args), map(f, parms))
     loss = map(x -> _loss(x, test), models)
     @debug "Fitted models" parms args loss
     return loss
 end
 
-@inline function _fit_split(T, parms, train, test, args)
-    models = pmap(x -> _fit!(T(; x...), train, args), parms)
+@inline function _fit_split(f, parms, train, test, args)
+    models = pmap(x -> _fit!(x, train, args), map(f, parms))
     loss = map(x -> _loss(x, test), models)
     @debug "Fitted models" parms args loss
     return models, loss
@@ -349,24 +349,24 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(T::Type, parms, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
+function brute(f::Function, parms, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     @debug "Start brute-force search"
-    loss = _val(T, parms, data, args)
+    loss = _val(f, parms, data, args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     
     return parms[ind]
 end
 
-function brutefit(T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
+function brutefit(f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     train, val = first(data)
 
     @debug "Start brute-force search"
-    models, loss = _fit_split(T, parms, train, val, args)
+    models, loss = _fit_split(f, parms, train, val, args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     
@@ -407,7 +407,7 @@ end
     return [neighbors(rng, s, at, step) for _ in 1:n]
 end
 
-function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
+function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
 
     parm = nothing
@@ -416,7 +416,7 @@ function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResam
     nbrs = rand(rng, space, n)
     @debug "Start hill-climbing"
     @inbounds while !isempty(nbrs)
-        loss = _val(T, nbrs, data, args)
+        loss = _val(f, nbrs, data, args)
         if maximize
             i = argmax(loss)
             loss[i] > best || break
@@ -432,10 +432,10 @@ function hc(rng::AbstractRNG, T::Type, space::AbstractSpace, data::AbstractResam
     return parm
 end
 
-hc(T::Type, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
-    hc(GLOBAL_RNG, T, space, data, step, args = args, n = n, maximize = maximize)
+hc(f::Function, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
+    hc(GLOBAL_RNG, f, space, data, step, args = args, n = n, maximize = maximize)
 
-function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
+function hcfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
 
     model = nothing
@@ -446,7 +446,7 @@ function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicRes
     nbrs = rand(rng, space, n)
     @debug "Start hill-climbing"
     @inbounds while !isempty(nbrs)
-        models, loss = _fit_split(T, nbrs, train, val, args)
+        models, loss = _fit_split(f, nbrs, train, val, args)
         if maximize
             i = argmax(loss)
             loss[i] > best || break
@@ -462,8 +462,8 @@ function hcfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicRes
     return model
 end
 
-hcfit(T::Type, space::AbstractSpace, data::MonadicResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
-    hcfit(GLOBAL_RNG, T, space, data, step, args = args, n = n, maximize = maximize)
+hcfit(f::Function, space::AbstractSpace, data::MonadicResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
+    hcfit(GLOBAL_RNG, f, space, data, step, args = args, n = n, maximize = maximize)
 
 struct Budget{name, T<:Real}
     val::T
@@ -520,12 +520,12 @@ end
     return zip(arms, args)
 end
 
-@inline function _sha(T, parms, data, budget, mode, rate, maximize)
+@inline function _sha(f, parms, data, budget, mode, rate, maximize)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     train, val = first(data)
-    arms = map(x -> T(; x...), parms)
+    arms = map(f, parms)
 
     @debug "Start successive halving"
     @inbounds for (k, args) in allocate(budget, mode, length(arms), rate)
@@ -540,13 +540,13 @@ end
     return first(arms), first(parms)
 end
 
-sha(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
-    _sha(T, parms, data, budget, mode, rate, maximize)[2]
+sha(f::Function, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+    _sha(f, parms, data, budget, mode, rate, maximize)[2]
 
-shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
-    _sha(T, parms, data, budget, mode, rate, maximize)[1]
+shafit(f::Function, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
+    _sha(f, parms, data, budget, mode, rate, maximize)[1]
 
-@inline function _hyperband(rng, T, space, data, budget, rate, maximize)
+@inline function _hyperband(rng, f, space, data, budget, rate, maximize)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     arm, parm = nothing, nothing
@@ -560,7 +560,7 @@ shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationM
         loss = nothing
         narms = ceil(Int, n * rate^(i - 1) / i)
         parms = rand(rng, space, narms)
-        arms = map(x -> T(; x...), parms)
+        arms = map(f, parms)
 
         @debug "Start successive halving"
         for (k, args) in allocate(budget, HyperbandAllocation, i, narms, rate)
@@ -586,22 +586,22 @@ shafit(T::Type, parms, data::MonadicResampler, budget::Budget; mode::AllocationM
     return arm, parm
 end
 
-hyperband(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    _hyperband(rng, T, space, data, budget, rate, maximize)[2]
-hyperband(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    hyperband(GLOBAL_RNG, T, space, data, budget, rate = rate, maximize = maximize)
+hyperband(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+    _hyperband(rng, f, space, data, budget, rate, maximize)[2]
+hyperband(f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+    hyperband(GLOBAL_RNG, f, space, data, budget, rate = rate, maximize = maximize)
 
-hyperbandfit(rng::AbstractRNG, T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    _hyperband(rng, T, space, data, budget, rate, maximize)[1]
-hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    hyperbandfit(GLOBAL_RNG, T, space, data, budget, rate = rate, maximize = maximize)
+hyperbandfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+    _hyperband(rng, f, space, data, budget, rate, maximize)[1]
+hyperbandfit(f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
+    hyperbandfit(GLOBAL_RNG, f, space, data, budget, rate = rate, maximize = maximize)
 
-@inline function _sasha(rng, T, parms, data, args, temp, maximize)
+@inline function _sasha(rng, f, parms, data, args, temp, maximize)
     length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
     train, test = first(data)
-    arms = map(x -> T(; x...), parms)
+    arms = map(f, parms)
 
     n = 1
     @debug "Start SASHA"
@@ -627,14 +627,14 @@ hyperbandfit(T::Type, space::AbstractSpace, data::MonadicResampler, budget::Budg
     return first(arms), first(parms)
 end
 
-sasha(rng::AbstractRNG, T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
-    _sasha(rng, T, parms, data, args, temp, maximize)[2]
-sasha(T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
-    sasha(GLOBAL_RNG, T, parms, data, args = args, temp = temp, maximize = maximize)
+sasha(rng::AbstractRNG, f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+    _sasha(rng, f, parms, data, args, temp, maximize)[2]
+sasha(f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+    sasha(GLOBAL_RNG, f, parms, data, args = args, temp = temp, maximize = maximize)
 
-sashafit(rng::AbstractRNG, T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
-    _sasha(rng, T, parms, data, args, temp, maximize)[1]
-sashafit(T::Type, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
-    sashafit(GLOBAL_RNG, T, parms, data, args = args, temp = temp, maximize = maximize)
+sashafit(rng::AbstractRNG, f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+    _sasha(rng, f, parms, data, args, temp, maximize)[1]
+sashafit(f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+    sashafit(GLOBAL_RNG, f, parms, data, args = args, temp = temp, maximize = maximize)
 
 end

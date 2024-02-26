@@ -29,63 +29,63 @@ collect(SlidingWindow(1:10, 4, 2))
 x = rand(2, 100)
 data = FixedSplit(x, 0.8)
 
-validate(MyModel(a = 2.0, b = 2.0), data, args=(epochs = 100,))
+validate(MyModel(a = 2.0, b = 2.0), data, args = (epochs = 100,))
 
 sp = space(a = DiscreteUniform(-8.0:1.0:8.0), b = DiscreteUniform(-8.0:1.0:8.0))
 
-brute(MyModel, sp, data, args = (epochs = 100,), maximize = false)
-brutefit(MyModel, sp, data, args = (epochs = 100,), maximize = false)
+brute((x) -> MyModel(; x...), sp, data, args = (epochs = 100,), maximize = false)
+brutefit((x) -> MyModel(; x...), sp, data, args = (epochs = 100,), maximize = false)
 
-brute(MyModel, rand(sp, 64), data, args = (epochs = 100,), maximize = false)
-brutefit(MyModel, rand(sp, 64), data, args = (epochs = 100,), maximize = false)
+brute((x) -> MyModel(; x...), rand(sp, 64), data, args = (epochs = 100,), maximize = false)
+brutefit((x) -> MyModel(; x...), rand(sp, 64), data, args = (epochs = 100,), maximize = false)
 
-hc(MyModel, sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
-hcfit(MyModel, sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
+hc((x) -> MyModel(; x...), sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
+hcfit((x) -> MyModel(; x...), sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
 
-sha(MyModel, sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
-shafit(MyModel, sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
+sha((x) -> MyModel(; x...), sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
+shafit((x) -> MyModel(; x...), sp, data, Budget{:epochs}(448), mode = GeometricAllocation, rate = 2, maximize = false)
 
-sha(MyModel, rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
-shafit(MyModel, rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
+sha((x) -> MyModel(; x...), rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
+shafit((x) -> MyModel(; x...), rand(sp, 64), data, Budget{:epochs}(600), mode = ConstantAllocation, rate = 2, maximize = false)
 
-hyperband(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
-hyperbandfit(MyModel, sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
+hyperband((x) -> MyModel(; x...), sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
+hyperbandfit((x) -> MyModel(; x...), sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
 
-sasha(MyModel, sp, data, args = (epochs = 1,), temp = 1, maximize = false)
-sashafit(MyModel, sp, data, args = (epochs = 1,), temp = 1, maximize = false)
+sasha((x) -> MyModel(; x...), sp, data, args = (epochs = 1,), temp = 1, maximize = false)
+sashafit((x) -> MyModel(; x...), sp, data, args = (epochs = 1,), temp = 1, maximize = false)
 
 validate(KFold(x, 10)) do train
-    parm = brute(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), maximize = false)
+    parm = brute((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), args = (epochs = 100,), maximize = false)
     return fit!(MyModel(; parm...), train, epochs = 10)
 end
 
 validate(KFold(x, 10)) do train
-    parm = hc(MyModel, sp, FixedSplit(train, 0.8), 1, args = (epochs = 100,), n = 10, maximize = false)
+    parm = hc((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), 1, args = (epochs = 100,), n = 10, maximize = false)
     return fit!(MyModel(; parm...), train, epochs = 10)
 end
 
 validate(KFold(x, 10)) do train
-    parm = sha(MyModel, sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
+    parm = sha((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
     return fit!(MyModel(; parm...), train, epochs = 10)
 end
 
 validate(KFold(x, 10)) do train
-    parm = sasha(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
+    parm = sasha((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
     return fit!(MyModel(; parm...), train, epochs = 10)
 end
 
 validate(KFold(x, 10)) do train
-    return brutefit(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 100,), maximize = false)
+    return brutefit((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), args = (epochs = 100,), maximize = false)
 end
 
 validate(KFold(x, 10)) do train
-    return hcfit(MyModel, sp, FixedSplit(train, 0.8), 1, args = (epochs = 100,), n = 10, maximize = false)
+    return hcfit((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), 1, args = (epochs = 100,), n = 10, maximize = false)
 end
 
 validate(KFold(x, 10)) do train
-    return shafit(MyModel, sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
+    return shafit((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation, rate = 2, maximize = false)
 end
 
 validate(KFold(x, 10)) do train
-    return sashafit(MyModel, sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
+    return sashafit((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), args = (epochs = 1,), temp = 1, maximize = false)
 end
