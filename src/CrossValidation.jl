@@ -599,12 +599,12 @@ hyperbandfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicR
 hyperbandfit(f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
     hyperbandfit(GLOBAL_RNG, f, space, data, budget, rate = rate, maximize = maximize)
 
-@inline function _sasha(rng, f, parms, data, args, temp, maximize)
-    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+@inline function _sasha(rng, f, space, data, args, temp, maximize)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     temp ≥ 0 || throw(ArgumentError("initial temperature must be positive"))
 
     train, test = first(data)
-    arms = map(f, parms)
+    arms = map(f, space)
 
     n = 1
     @debug "Start SASHA"
@@ -618,26 +618,26 @@ hyperbandfit(f::Function, space::AbstractSpace, data::MonadicResampler, budget::
             prob = exp.(-n .* (loss .- min(loss...)) ./ temp)
         end        
 
-        @debug "Fitted arms" parms prob loss
+        @debug "Fitted arms" space prob loss
 
         inds = findall(rand(rng, length(prob)) .≤ prob)
-        arms, parms = arms[inds], parms[inds]
+        arms, space = arms[inds], space[inds]
 
         n += 1
     end
     @debug "Finished SASHA"
 
-    return first(arms), first(parms)
+    return first(arms), first(space)
 end
 
-sasha(rng::AbstractRNG, f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
-    _sasha(rng, f, parms, data, args, temp, maximize)[2]
-sasha(f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
-    sasha(GLOBAL_RNG, f, parms, data, args = args, temp = temp, maximize = maximize)
+sasha(rng::AbstractRNG, f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+    _sasha(rng, f, space, data, args, temp, maximize)[2]
+sasha(f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+    sasha(GLOBAL_RNG, f, space, data, args = args, temp = temp, maximize = maximize)
 
-sashafit(rng::AbstractRNG, f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
-    _sasha(rng, f, parms, data, args, temp, maximize)[1]
-sashafit(f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
-    sashafit(GLOBAL_RNG, f, parms, data, args = args, temp = temp, maximize = maximize)
+sashafit(rng::AbstractRNG, f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+    _sasha(rng, f, space, data, args, temp, maximize)[1]
+sashafit(f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+    sashafit(GLOBAL_RNG, f, space, data, args = args, temp = temp, maximize = maximize)
 
 end
