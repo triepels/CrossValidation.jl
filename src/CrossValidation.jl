@@ -317,21 +317,21 @@ _loss(model, x) = loss(model, x)
 
 loss(model, x) = throw(MethodError(loss, (model, x)))
 
-@inline function _val(f, parms, data, args)
-    return sum(x -> _val_split(f, parms, x..., args), data) / length(data)
+@inline function _val(f, space, data, args)
+    return sum(x -> _val_split(f, space, x..., args), data) / length(data)
 end
 
-@inline function _val_split(f, parms, train, test, args)
-    models = pmap(x -> _fit!(x, train, args), map(f, parms))
+@inline function _val_split(f, space, train, test, args)
+    models = pmap(x -> _fit!(x, train, args), map(f, space))
     loss = map(x -> _loss(x, test), models)
-    @debug "Fitted models" parms args loss
+    @debug "Fitted models" space args loss
     return loss
 end
 
-@inline function _fit_split(f, parms, train, test, args)
-    models = pmap(x -> _fit!(x, train, args), map(f, parms))
+@inline function _fit_split(f, space, train, test, args)
+    models = pmap(x -> _fit!(x, train, args), map(f, space))
     loss = map(x -> _loss(x, test), models)
-    @debug "Fitted models" parms args loss
+    @debug "Fitted models" space args loss
     return models, loss
 end
 
@@ -349,24 +349,24 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(f::Function, parms, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
-    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function brute(f::Function, space, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     @debug "Start brute-force search"
-    loss = _val(f, parms, data, args)
+    loss = _val(f, space, data, args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     
-    return parms[ind]
+    return space[ind]
 end
 
-function brutefit(f::Function, parms, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
-    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
+function brutefit(f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     train, val = first(data)
 
     @debug "Start brute-force search"
-    models, loss = _fit_split(f, parms, train, val, args)
+    models, loss = _fit_split(f, space, train, val, args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     
