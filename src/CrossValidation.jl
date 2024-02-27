@@ -366,6 +366,10 @@ function brutefit(f::Function, space, data::MonadicResampler; args::NamedTuple =
     return models[ind]
 end
 
+@propagate_inbounds function neighbors(rng::AbstractRNG, x, at, step, n::Int)
+    return [neighbors(rng, x, at, step) for _ in OneTo(n)]
+end
+
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
 @propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution{T}, at::T, step::T) where T<:Int
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
@@ -388,16 +392,8 @@ end
     return (b - a) * rand(rng, T) + a
 end
 
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::AbstractDistribution, at, step, n::Int)
-    return [neighbors(rng, d, at, step) for _ in OneTo(n)]
-end
-
 @propagate_inbounds function neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at::NamedTuple{names}, step) where names
     return NamedTuple{names}(neighbors.(rng, s.vars, values(at), step))
-end
-
-@propagate_inbounds function neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at::NamedTuple{names}, step, n::Int) where names
-    return [neighbors(rng, s, at, step) for _ in 1:n]
 end
 
 function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
