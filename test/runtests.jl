@@ -31,7 +31,7 @@ data = FixedSplit(x, 0.8)
 
 validate(MyModel(a = 2.0, b = 2.0), data, args = (epochs = 100,))
 
-sp = space(a = DiscreteUniform(-8.0:1.0:8.0), b = DiscreteUniform(-8.0:1.0:8.0))
+sp = space(a = DiscreteUniform(-5.0:1.0:5.0), b = DiscreteUniform(-5.0:1.0:5.0))
 
 brute((x) -> MyModel(; x...), sp, data, args = (epochs = 100,), maximize = false)
 brutefit((x) -> MyModel(; x...), sp, data, args = (epochs = 100,), maximize = false)
@@ -42,11 +42,11 @@ brutefit((x) -> MyModel(; x...), rand(sp, 64), data, args = (epochs = 100,), max
 hc((x) -> MyModel(; x...), sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
 hcfit((x) -> MyModel(; x...), sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
 
-sha((x) -> MyModel(; x...), sp, data, Budget{:epochs}(448), mode = GeometricAllocation(2), maximize = false)
-shafit((x) -> MyModel(; x...), sp, data, Budget{:epochs}(448), mode = GeometricAllocation(2), maximize = false)
+sha((x) -> MyModel(; x...), sp, data, Budget{:epochs}(1024), mode = GeometricAllocation(2), maximize = false)
+shafit((x) -> MyModel(; x...), sp, data, Budget{:epochs}(1024), mode = GeometricAllocation(2), maximize = false)
 
-sha((x) -> MyModel(; x...), rand(sp, 64), data, Budget{:epochs}(600), mode = ContstantAllocation(2), maximize = false)
-shafit((x) -> MyModel(; x...), rand(sp, 64), data, Budget{:epochs}(600), mode = ContstantAllocation(2), maximize = false)
+sha((x) -> MyModel(; x...), rand(sp, 64), data, Budget{:epochs}(512), mode = ContstantAllocation(2), maximize = false)
+shafit((x) -> MyModel(; x...), rand(sp, 64), data, Budget{:epochs}(512), mode = ContstantAllocation(2), maximize = false)
 
 hyperband((x) -> MyModel(; x...), sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
 hyperbandfit((x) -> MyModel(; x...), sp, data, Budget{:epochs}(81), rate = 3, maximize = false)
@@ -65,7 +65,7 @@ validate(KFold(x, 10)) do train
 end
 
 validate(KFold(x, 10)) do train
-    parm = sha((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation(2), maximize = false)
+    parm = sha((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), Budget{:epochs}(1024), mode = GeometricAllocation(2), maximize = false)
     return fit!(MyModel(; parm...), train, epochs = 10)
 end
 
@@ -83,7 +83,7 @@ validate(KFold(x, 10)) do train
 end
 
 validate(KFold(x, 10)) do train
-    return shafit((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), Budget{:epochs}(100), mode = GeometricAllocation(2), maximize = false)
+    return shafit((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), Budget{:epochs}(1024), mode = GeometricAllocation(2), maximize = false)
 end
 
 validate(KFold(x, 10)) do train

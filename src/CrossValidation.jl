@@ -528,7 +528,7 @@ end
     return zip(arms, args)
 end
 
-@inline function _sha(f, space, data, budget, mode, maximize)
+@inline function _sha(f, space, data, budget, args, mode, maximize)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
     loss = nothing
@@ -536,7 +536,8 @@ end
     train, val = first(data)
 
     @debug "Start successive halving"
-    @inbounds for (k, args) in allocate(budget, mode, length(arms))
+    @inbounds for (k, arg) in allocate(budget, mode, length(arms))
+        args = merge(args, arg)
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, val), arms)
         @debug "Fitted arms" space args loss
@@ -548,13 +549,13 @@ end
     return first(arms), first(space), first(loss)
 end
 
-sha(f::Function, space, data::MonadicResampler, budget::Budget; mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) =
-    _sha(f, space, data, budget, mode, maximize)[2]
+sha(f::Function, space, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) =
+    _sha(f, space, data, budget, args, mode, maximize)[2]
 
-shafit(f::Function, space, data::MonadicResampler, budget::Budget; mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) =
-    _sha(f, space, data, budget, mode, maximize)[1]
+shafit(f::Function, space, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) =
+    _sha(f, space, data, budget, args, mode, maximize)[1]
 
-@inline function _hyperband(rng, f, space, data, budget, rate, maximize)
+@inline function _hyperband(rng, f, space, data, budget, args, rate, maximize)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
     best = (nothing, nothing, maximize ? -Inf : Inf)
@@ -563,7 +564,7 @@ shafit(f::Function, space, data::MonadicResampler, budget::Budget; mode::Abstrac
     @debug "Start hyperband"
     @inbounds for i in reverse(OneTo(n))
         curr = _sha(f, rand(rng, space, ceil(Int, n * rate^(i - 1) / i)), 
-                    data, budget, HyperbandAllocation(i, rate), maximize)
+                    data, budget, args, HyperbandAllocation(i, rate), maximize)
 
         if maximize
             curr[3] > best[3] || continue
@@ -578,15 +579,15 @@ shafit(f::Function, space, data::MonadicResampler, budget::Budget; mode::Abstrac
     return best
 end
 
-hyperband(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    _hyperband(rng, f, space, data, budget, rate, maximize)[2]
-hyperband(f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    hyperband(GLOBAL_RNG, f, space, data, budget, rate = rate, maximize = maximize)
+hyperband(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), rate::Real = 3, maximize::Bool = false) =
+    _hyperband(rng, f, space, data, budget, args, rate, maximize)[2]
+hyperband(f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), rate::Real = 3, maximize::Bool = false) =
+    hyperband(GLOBAL_RNG, f, space, data, budget, args = args, rate = rate, maximize = maximize)
 
-hyperbandfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    _hyperband(rng, f, space, data, budget, rate, maximize)[1]
-hyperbandfit(f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
-    hyperbandfit(GLOBAL_RNG, f, space, data, budget, rate = rate, maximize = maximize)
+hyperbandfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), rate::Real = 3, maximize::Bool = false) =
+    _hyperband(rng, f, space, data, budget, args, rate, maximize)[1]
+hyperbandfit(f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), rate::Real = 3, maximize::Bool = false) =
+    hyperbandfit(GLOBAL_RNG, f, space, data, budget, args = args, rate = rate, maximize = maximize)
 
 @inline function _sasha(rng, f, space, data, args, temp, maximize)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
