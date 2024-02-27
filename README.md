@@ -17,7 +17,7 @@ julia> import CrossValidation: fit!, loss
 Function `fit!` takes a model and fits it on data based on some optional fitting arguments:
 
 ```julia
-julia> function fit!(model::MyModel, data; args)
+julia> function fit!(model::MyModel, data)
            # Code to fit model...
        end
 ```
@@ -33,20 +33,22 @@ julia> function loss(model::MyModel, data)
 # Features
 Model validation based on various resample methods:
 ```julia
-julia> validate(MyModel(), KFold(data, 10))
+julia> validate(KFold(data, 10)) do train
+            return fit!(MyModel(; args), train)
+       end
 ```
 
 Hyperparameter optimization using various optimizers:
 ```julia
 julia> sp = space(a = DiscreteUniform(1:10))
-julia> sha(MyModel, sp, FixedSplit(data, 0.8), Budget{:arg}(100))
+julia> sha((x) -> MyModel(; x...), sp, FixedSplit(data, 0.8), Budget{:arg}(100))
 ```
 
 Model validation with hyperparameter optimization:
 ```julia
 julia> validate(KFold(data, 10)) do train
-           parm = brute(MyModel, sp, FixedSplit(train, 0.8))
-           return fit!(MyModel(; parm...), train)
+           args = brute((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8))
+           return fit!(MyModel(; args...), train)
        end
 ```
 
