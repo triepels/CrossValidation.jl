@@ -9,7 +9,7 @@ import Random: rand
 export AbstractResampler, MonadicResampler, VariadicResampler, FixedSplit, RandomSplit, LeaveOneOut, KFold, ForwardChaining, SlidingWindow,
        AbstractSpace, FiniteSpace, InfiniteSpace, space,
        AbstractDistribution, DiscreteDistribution, ContinousDistribution, Discrete, DiscreteUniform, Uniform, LogUniform, Normal,
-       Budget, AllocationMode, GeometricAllocation, ConstantAllocation, HyperbandAllocation, allocate,
+       Budget, AbstractAllocation, GeometricAllocation, ContstantAllocation, HyperbandAllocation, allocate,
        fit!, loss, validate, brute, brutefit, hc, hcfit, sha, shafit, hyperband, hyperbandfit, sasha, sashafit
 
 nobs(x::AbstractArray) = size(x)[end]
@@ -476,114 +476,117 @@ _cast(::Type{T}, x::Real, r) where T<:Real = T(x)
 _cast(::Type{T}, x::AbstractFloat, r) where T<:Integer = round(T, x, r)
 _cast(::Type{T}, x::T, r) where T<:Real = x
 
-struct AllocationMode{M} end
+abstract type AbstractAllocation end
 
-const GeometricAllocation = AllocationMode{:Geometric}()
-const ConstantAllocation = AllocationMode{:Constant}()
-const HyperbandAllocation = AllocationMode{:Hyperband}()
-
-@propagate_inbounds function allocate(budget::Budget, mode::AllocationMode, narms::Int, rate::Real)
-    nrounds = floor(Int, log(rate, narms)) + 1
-    return allocate(budget, mode, nrounds, narms, rate)
+struct GeometricAllocation <: AbstractAllocation
+    rate::Real
+    function GeometricAllocation(rate::Real)
+        rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
+        return new(rate)
+    end
 end
 
-@propagate_inbounds function allocate(budget::Budget{name, T}, mode::AllocationMode{:Geometric}, nrounds::Int, narms::Int, rate::Real) where {name, T}
+struct ContstantAllocation <: AbstractAllocation
+    rate::Real
+    function ContstantAllocation(rate::Real)
+        rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
+        return new(rate)
+    end
+end
+
+struct HyperbandAllocation <: AbstractAllocation
+    nrounds::Int
+    rate::Real
+    function HyperbandAllocation(nrounds::Int, rate::Real)
+        nrounds > 0 || throw(ArgumentError("unable to allocate arms over $nrounds rounds"))
+        rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
+        return new(nrounds, rate)
+    end
+end
+
+@propagate_inbounds function allocate(budget::Budget{name, T}, mode::GeometricAllocation, narms::Int) where {name, T}
+    nrounds = floor(Int, log(mode.rate, narms)) + 1
     arms = Vector{Int}(undef, nrounds)
     args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
     for i in OneTo(nrounds)
-        c = 1 / (round(Int, narms / rate^(i - 1)) * nrounds)
+        c = 1 / (round(Int, narms / mode.rate^(i - 1)) * nrounds)
         args[i] = NamedTuple{(name,)}(_cast(typeof(budget.val), c * budget.val, RoundDown))
-        arms[i] = ceil(Int, narms / rate^i)
+        arms[i] = ceil(Int, narms / mode.rate^i)
     end
     return zip(arms, args)
 end
 
-@propagate_inbounds function allocate(budget::Budget{name, T}, mode::AllocationMode{:Constant}, nrounds::Int, narms::Int, rate::Real) where {name, T}
+@propagate_inbounds function allocate(budget::Budget{name, T}, mode::ContstantAllocation, narms::Int) where {name, T}
+    nrounds = floor(Int, log(mode.rate, narms)) + 1
     arms = Vector{Int}(undef, nrounds)
     args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
-    c = (rate - 1) * rate^(nrounds - 1) / (narms * (rate^nrounds - 1))
+    c = (mode.rate - 1) * mode.rate^(nrounds - 1) / (narms * (mode.rate^nrounds - 1))
     for i in OneTo(nrounds)
         args[i] = NamedTuple{(name,)}(_cast(typeof(budget.val), c * budget.val, RoundDown))
-        arms[i] = ceil(Int, narms / rate^i)
+        arms[i] = ceil(Int, narms / mode.rate^i)
     end
     return zip(arms, args)
 end
 
-@propagate_inbounds function allocate(budget::Budget{name, T}, mode::AllocationMode{:Hyperband}, nrounds::Int, narms::Int, rate::Real) where {name, T}
-    arms = Vector{Int}(undef, nrounds)
-    args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
-    for i in OneTo(nrounds)
-        c = 1 / rate^(nrounds - i)
+@propagate_inbounds function allocate(budget::Budget{name, T}, mode::HyperbandAllocation, narms::Int) where {name, T}
+    arms = Vector{Int}(undef, mode.nrounds)
+    args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, mode.nrounds)
+    for i in OneTo(mode.nrounds)
+        c = 1 / mode.rate^(mode.nrounds - i)
         args[i] = NamedTuple{(name,)}(_cast(typeof(budget.val), c * budget.val, RoundNearest)) #RoundNearest?
-        arms[i] = max(floor(Int, narms / rate^i), 1)
+        arms[i] = max(floor(Int, narms / mode.rate^i), 1)
     end
     return zip(arms, args)
 end
 
-@inline function _sha(f, parms, data, budget, mode, rate, maximize)
-    length(parms) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
+@inline function _sha(f, space, data, budget, mode, maximize)
+    length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
+    loss = nothing
+    arms = map(f, space)
     train, val = first(data)
-    arms = map(f, parms)
 
     @debug "Start successive halving"
-    @inbounds for (k, args) in allocate(budget, mode, length(arms), rate)
+    @inbounds for (k, args) in allocate(budget, mode, length(arms))
         arms = pmap(x -> _fit!(x, train, args), arms)
         loss = map(x -> _loss(x, val), arms)
-        @debug "Fitted arms" parms args loss
-        inds = sortperm(loss, rev=maximize)[OneTo(k)]
-        arms, parms = arms[inds], parms[inds]
+        @debug "Fitted arms" space args loss
+        inds = sortperm(loss, rev = maximize)[OneTo(k)]
+        arms, space = arms[inds], space[inds]
     end
     @debug "Finished successive halving"
 
-    return first(arms), first(parms)
+    return first(arms), first(space), first(loss)
 end
 
-sha(f::Function, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
-    _sha(f, parms, data, budget, mode, rate, maximize)[2]
+sha(f::Function, space, data::MonadicResampler, budget::Budget; mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) =
+    _sha(f, space, data, budget, mode, maximize)[2]
 
-shafit(f::Function, parms, data::MonadicResampler, budget::Budget; mode::AllocationMode = GeometricAllocation, rate::Real = 2, maximize::Bool = false) =
-    _sha(f, parms, data, budget, mode, rate, maximize)[1]
+shafit(f::Function, space, data::MonadicResampler, budget::Budget; mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) =
+    _sha(f, space, data, budget, mode, maximize)[1]
 
 @inline function _hyperband(rng, f, space, data, budget, rate, maximize)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
-    arm, parm = nothing, nothing
-    best = maximize ? -Inf : Inf
-
-    train, val = first(data)
+    best = (nothing, nothing, maximize ? -Inf : Inf)
     n = floor(Int, log(rate, budget.val)) + 1
 
     @debug "Start hyperband"
     @inbounds for i in reverse(OneTo(n))
-        loss = nothing
-        narms = ceil(Int, n * rate^(i - 1) / i)
-        parms = rand(rng, space, narms)
-        arms = map(f, parms)
-
-        @debug "Start successive halving"
-        for (k, args) in allocate(budget, HyperbandAllocation, i, narms, rate)
-            arms = pmap(x -> _fit!(x, train, args), arms)
-            loss = map(x -> _loss(x, val), arms)
-            @debug "Fitted arms" parms args loss
-            inds = sortperm(loss, rev=maximize)[OneTo(k)]
-            arms, parms = arms[inds], parms[inds]
-        end
-        @debug "Finished successive halving"
+        curr = _sha(f, rand(rng, space, ceil(Int, n * rate^(i - 1) / i)), 
+                    data, budget, HyperbandAllocation(i, rate), maximize)
 
         if maximize
-            first(loss) > best || continue
+            curr[3] > best[3] || continue
         else
-            first(loss) < best || continue
+            curr[3] < best[3] || continue
         end
 
-        arm, parm = first(arms), first(parms)
-        best = first(loss)
+        best = curr
     end
     @debug "Finished hyperband"
 
-    return arm, parm
+    return best
 end
 
 hyperband(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, budget::Budget; rate::Real = 3, maximize::Bool = false) =
