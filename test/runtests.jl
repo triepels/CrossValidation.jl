@@ -29,8 +29,6 @@ collect(SlidingWindow(1:10, 4, 2))
 x = rand(2, 100)
 data = FixedSplit(x, 0.8)
 
-validate(MyModel(a = 2.0, b = 2.0), data, args = (epochs = 100,))
-
 sp = space(a = DiscreteUniform(-5.0:1.0:5.0), b = DiscreteUniform(-5.0:1.0:5.0))
 
 brute((x) -> MyModel(; x...), sp, data, args = (epochs = 100,), maximize = false)

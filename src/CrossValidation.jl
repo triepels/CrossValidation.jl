@@ -328,13 +328,6 @@ end
     return models, loss
 end
 
-function validate(model, data::AbstractResampler; args::NamedTuple = ())
-    @debug "Start model validation"
-    loss = map(x -> _loss(_fit!(model, x[1], args), x[2]), data)
-    @debug "Finished model validation"
-    return loss
-end
-
 function validate(f::Function, data::AbstractResampler)
     @debug "Start model validation"
     loss = map(x -> _loss(f(x[1]), x[2]), data)
