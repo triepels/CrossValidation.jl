@@ -370,6 +370,10 @@ end
     return [neighbors(rng, x, at, step) for _ in OneTo(n)]
 end
 
+@propagate_inbounds function neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at::NamedTuple{names}, step) where names
+    return NamedTuple{names}(neighbors.(rng, s.vars, values(at), step))
+end
+
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
 @propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution{T}, at::T, step::T) where T<:Int
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
@@ -390,10 +394,6 @@ end
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
     a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
     return (b - a) * rand(rng, T) + a
-end
-
-@propagate_inbounds function neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at::NamedTuple{names}, step) where names
-    return NamedTuple{names}(neighbors.(rng, s.vars, values(at), step))
 end
 
 function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
