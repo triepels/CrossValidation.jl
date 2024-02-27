@@ -318,14 +318,7 @@ _loss(model, x) = loss(model, x)
 loss(model, x) = throw(MethodError(loss, (model, x)))
 
 @inline function _val(f, space, data, args)
-    return sum(x -> _val_split(f, space, x..., args), data) / length(data)
-end
-
-@inline function _val_split(f, space, train, test, args)
-    models = pmap(x -> _fit!(x, train, args), map(f, space))
-    loss = map(x -> _loss(x, test), models)
-    @debug "Fitted models" space args loss
-    return loss
+    return sum(x -> _fit_split(f, space, x..., args)[2], data) / length(data)
 end
 
 @inline function _fit_split(f, space, train, test, args)
@@ -347,6 +340,12 @@ function validate(f::Function, data::AbstractResampler)
     loss = map(x -> _loss(f(x[1]), x[2]), data)
     @debug "Finished model validation"
     return loss
+end
+
+function _brute(f, space, data, args, maximize)
+
+
+    
 end
 
 function brute(f::Function, space, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
