@@ -477,45 +477,45 @@ struct ContstantAllocation <: AbstractAllocation
 end
 
 struct HyperbandAllocation <: AbstractAllocation
-    nrounds::Int
+    n::Int
     rate::Real
-    function HyperbandAllocation(nrounds::Int, rate::Real)
-        nrounds > 0 || throw(ArgumentError("unable to allocate arms over $nrounds rounds"))
+    function HyperbandAllocation(n::Int, rate::Real)
+        n > 0 || throw(ArgumentError("unable to allocate arms over $n rounds"))
         rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
-        return new(nrounds, rate)
+        return new(n, rate)
     end
 end
 
 @propagate_inbounds function allocate(budget::Budget{name, T}, mode::GeometricAllocation, narms::Int) where {name, T}
-    nrounds = floor(Int, log(mode.rate, narms)) + 1
-    arms = Vector{Int}(undef, nrounds)
-    args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
-    for i in OneTo(nrounds)
-        c = 1 / (round(Int, narms / mode.rate^(i - 1)) * nrounds)
-        args[i] = NamedTuple{(name,)}(_cast(typeof(budget.val), c * budget.val, RoundDown))
+    n = floor(Int, log(mode.rate, narms)) + 1
+    arms = Vector{Int}(undef, n)
+    args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, n)
+    for i in OneTo(n)
+        c = 1 / (round(Int, narms / mode.rate^(i - 1)) * n)
+        args[i] = NamedTuple{(name,)}(_cast(T, c * budget.val, RoundDown))
         arms[i] = ceil(Int, narms / mode.rate^i)
     end
     return zip(arms, args)
 end
 
 @propagate_inbounds function allocate(budget::Budget{name, T}, mode::ContstantAllocation, narms::Int) where {name, T}
-    nrounds = floor(Int, log(mode.rate, narms)) + 1
-    arms = Vector{Int}(undef, nrounds)
-    args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, nrounds)
-    c = (mode.rate - 1) * mode.rate^(nrounds - 1) / (narms * (mode.rate^nrounds - 1))
-    for i in OneTo(nrounds)
-        args[i] = NamedTuple{(name,)}(_cast(typeof(budget.val), c * budget.val, RoundDown))
+    n = floor(Int, log(mode.rate, narms)) + 1
+    arms = Vector{Int}(undef, n)
+    args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, n)
+    c = (mode.rate - 1) * mode.rate^(n - 1) / (narms * (mode.rate^n - 1))
+    for i in OneTo(n)
+        args[i] = NamedTuple{(name,)}(_cast(T, c * budget.val, RoundDown))
         arms[i] = ceil(Int, narms / mode.rate^i)
     end
     return zip(arms, args)
 end
 
 @propagate_inbounds function allocate(budget::Budget{name, T}, mode::HyperbandAllocation, narms::Int) where {name, T}
-    arms = Vector{Int}(undef, mode.nrounds)
-    args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, mode.nrounds)
-    for i in OneTo(mode.nrounds)
-        c = 1 / mode.rate^(mode.nrounds - i)
-        args[i] = NamedTuple{(name,)}(_cast(typeof(budget.val), c * budget.val, RoundNearest)) #RoundNearest?
+    arms = Vector{Int}(undef, mode.n)
+    args = Vector{NamedTuple{(name,), Tuple{T}}}(undef, mode.n)
+    for i in OneTo(mode.n)
+        c = 1 / mode.rate^(mode.n - i)
+        args[i] = NamedTuple{(name,)}(_cast(T, c * budget.val, RoundNearest)) #RoundNearest?
         arms[i] = max(floor(Int, narms / mode.rate^i), 1)
     end
     return zip(arms, args)
