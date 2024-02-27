@@ -342,12 +342,6 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function _brute(f, space, data, args, maximize)
-
-
-    
-end
-
 function brute(f::Function, space, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
