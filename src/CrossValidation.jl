@@ -338,11 +338,9 @@ end
 
 function brutefit(f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
-    
-    train, val = first(data)
 
     @debug "Start brute-force search"
-    models, loss = _fit_split(f, space, train, val, args)
+    models, loss = _fit_split(f, space, first(data)..., args)
     ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     
