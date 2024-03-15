@@ -330,10 +330,9 @@ function brute(f::Function, space, data::AbstractResampler; args::NamedTuple = N
     
     @debug "Start brute-force search"
     loss = _val(f, space, data, args)
-    ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     
-    return space[ind]
+    return space[maximize ? argmax(loss) : argmin(loss)]
 end
 
 function brutefit(f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
@@ -341,10 +340,9 @@ function brutefit(f::Function, space, data::MonadicResampler; args::NamedTuple =
 
     @debug "Start brute-force search"
     models, loss = _fit_split(f, space, first(data)..., args)
-    ind = maximize ? argmax(loss) : argmin(loss)
     @debug "Finished brute-force search"
     
-    return models[ind]
+    return models[maximize ? argmax(loss) : argmin(loss)]
 end
 
 @propagate_inbounds function neighbors(rng::AbstractRNG, x, at, step, n::Int)
