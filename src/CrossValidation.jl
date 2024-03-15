@@ -252,16 +252,6 @@ rand(rng::AbstractRNG, d::SamplerTrivial{Uniform{T}}) where T = T(d[].a + (d[].b
 rand(rng::AbstractRNG, d::SamplerTrivial{LogUniform{T}}) where T = T(exp(log(d[].a) + (log(d[].b) - log(d[].a)) * rand(rng, T)))
 rand(rng::AbstractRNG, d::SamplerTrivial{Normal{T}}) where T = T(d[].mean + d[].std * randn(rng, T))
 
-lowerbound(d::DiscreteDistribution) = 1
-lowerbound(d::Uniform) = d.a
-lowerbound(d::LogUniform) = d.a
-lowerbound(d::Normal) = -Inf
-
-upperbound(d::DiscreteDistribution) = length(d)
-upperbound(d::Uniform) = d.b
-upperbound(d::LogUniform) = d.b
-upperbound(d::Normal) = Inf
-
 abstract type AbstractSpace{names, T<:Tuple} end
 
 Base.eltype(::Type{S}) where S<:AbstractSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
@@ -368,17 +358,17 @@ end
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution, at, step::Int)
-    @boundscheck at ∈ values(d) || throw(BoundsError(d, at))
-    ind = findfirst(values(d) .== at)
-    a, b = max(lowerbound(d), ind - abs(step)), min(ind + abs(step), upperbound(d))
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteUniform, at, step::Int)
+    @boundscheck at ∈ d.vals || throw(BoundsError(d, at))
+    ind = findfirst(d.vals .== at)
+    a, b = max(1, ind - abs(step)), min(ind + abs(step), length(d))
     return d[rand(rng, a:b)]
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::ContinousDistribution, at::T, step::Real) where T<:Real
-    @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
-    a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::Uniform, at::T, step::Real) where T<:Real
+    @boundscheck d.a ≤ at ≤ d.b || throw(BoundsError(d, at))
+    a, b = max(d.a, at - abs(step)), min(at + abs(step), d.b)
     return (b - a) * rand(rng, T) + a
 end
 
