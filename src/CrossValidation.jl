@@ -364,10 +364,10 @@ end
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::Uniform, at::T, step::Real) where T<:Real
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::Uniform{T}, at::Real, step::Real) where T<:Real
     @boundscheck d.a ≤ at ≤ d.b || throw(BoundsError(d, at))
     a, b = max(d.a, at - abs(step)), min(at + abs(step), d.b)
-    return (b - a) * rand(rng, T) + a
+    return T((b - a) * rand(rng, T) + a)
 end
 
 function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
