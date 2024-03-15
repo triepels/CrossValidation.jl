@@ -353,7 +353,7 @@ end
     return NamedTuple{names}(neighbors.(rng, s.vars, values(at), step))
 end
 
-# TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
+# TODO: do something like @domaincheck?
 @propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteUniform, at, step::Int)
     ind = findfirst(d.vals .== at)
     isnothing(ind) && throw(DomainError(at, "$d is undefined at $at"))
@@ -361,7 +361,7 @@ end
     return d[rand(rng, a:b)]
 end
 
-# TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
+# TODO: do something like @domaincheck?
 @propagate_inbounds function neighbors(rng::AbstractRNG, d::Uniform{T}, at::Real, step::Real) where T<:Real
     d.a ≤ at ≤ d.b || throw(DomainError(at, "$d is undefined at $at"))
     a, b = max(d.a, at - abs(step)), min(at + abs(step), d.b)
