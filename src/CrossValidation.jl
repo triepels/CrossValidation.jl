@@ -422,13 +422,11 @@ function hcfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::Monadi
 
     model = nothing
     best = maximize ? -Inf : Inf
-
-    train, val = first(data)
-    
+  
     nbrs = neighbors(rng, space, rand(rng, space), step, n)
     @debug "Start hill-climbing"
     @inbounds while !isempty(nbrs)
-        models, loss = _fit_split(f, nbrs, train, val, args)
+        models, loss = _fit_split(f, nbrs, first(data)..., args)
         if maximize
             i = argmax(loss)
             loss[i] > best || break
