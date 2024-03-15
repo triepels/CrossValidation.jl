@@ -388,10 +388,10 @@ function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractR
     parm = nothing
     best = maximize ? -Inf : Inf
 
-    nbrs = neighbors(rng, space, rand(rng, space), step, n)
+    nb = neighbors(rng, space, rand(rng, space), step, n)
     @debug "Start hill-climbing"
-    @inbounds while !isempty(nbrs)
-        loss = _val(f, nbrs, data, args)
+    @inbounds while !isempty(nb)
+        loss = _val(f, nb, data, args)
         if maximize
             i = argmax(loss)
             loss[i] > best || break
@@ -399,8 +399,8 @@ function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractR
             i = argmin(loss)
             loss[i] < best || break
         end
-        parm, best = nbrs[i], loss[i]
-        nbrs = neighbors(rng, space, parm, step, n)
+        parm, best = nb[i], loss[i]
+        nb = neighbors(rng, space, parm, step, n)
     end
     @debug "Finished hill-climbing"
 
@@ -416,10 +416,10 @@ function hcfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::Monadi
     model = nothing
     best = maximize ? -Inf : Inf
   
-    nbrs = neighbors(rng, space, rand(rng, space), step, n)
+    nb = neighbors(rng, space, rand(rng, space), step, n)
     @debug "Start hill-climbing"
-    @inbounds while !isempty(nbrs)
-        models, loss = _fit_split(f, nbrs, first(data)..., args)
+    @inbounds while !isempty(nb)
+        models, loss = _fit_split(f, nb, first(data)..., args)
         if maximize
             i = argmax(loss)
             loss[i] > best || break
@@ -428,7 +428,7 @@ function hcfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::Monadi
             loss[i] < best || break
         end
         model, best = models[i], loss[i]
-        nbrs = neighbors(rng, space, nbrs[i], step, n)
+        nb = neighbors(rng, space, nb[i], step, n)
     end
     @debug "Finished hill-climbing"
 
