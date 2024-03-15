@@ -395,7 +395,7 @@ function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractR
     parm = nothing
     best = maximize ? -Inf : Inf
 
-    nbrs = rand(rng, space, n)
+    nbrs = neighbors(rng, space, rand(rng, space), step, n)
     @debug "Start hill-climbing"
     @inbounds while !isempty(nbrs)
         loss = _val(f, nbrs, data, args)
@@ -425,7 +425,7 @@ function hcfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::Monadi
 
     train, val = first(data)
     
-    nbrs = rand(rng, space, n)
+    nbrs = neighbors(rng, space, rand(rng, space), step, n)
     @debug "Start hill-climbing"
     @inbounds while !isempty(nbrs)
         models, loss = _fit_split(f, nbrs, train, val, args)
