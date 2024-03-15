@@ -357,15 +357,15 @@ end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
 @propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteUniform, at, step::Int)
-    @boundscheck at ∈ d.vals || throw(BoundsError(d, at))
     ind = findfirst(d.vals .== at)
+    isnothing(ind) && throw(DomainError(at, "$d is undefined at $at"))
     a, b = max(1, ind - abs(step)), min(ind + abs(step), length(d))
     return d[rand(rng, a:b)]
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
 @propagate_inbounds function neighbors(rng::AbstractRNG, d::Uniform{T}, at::Real, step::Real) where T<:Real
-    @boundscheck d.a ≤ at ≤ d.b || throw(BoundsError(d, at))
+    d.a ≤ at ≤ d.b || throw(DomainError(at, "$d is undefined at $at"))
     a, b = max(d.a, at - abs(step)), min(at + abs(step), d.b)
     return T((b - a) * rand(rng, T) + a)
 end
