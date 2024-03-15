@@ -376,7 +376,7 @@ end
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::ContinousDistribution, at, step::Real)
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::ContinousDistribution, at::T, step::Real) where T<:Real
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
     a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
     return (b - a) * rand(rng, T) + a
