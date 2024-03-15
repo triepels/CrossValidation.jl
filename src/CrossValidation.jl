@@ -368,14 +368,7 @@ end
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution{T}, at::T, step::T) where T<:Int
-    @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
-    a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
-    return rand(rng, a:b)
-end
-
-# TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution, at, step::T) where T<:Int
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteDistribution, at, step::Int)
     @boundscheck at ∈ values(d) || throw(BoundsError(d, at))
     ind = findfirst(values(d) .== at)
     a, b = max(lowerbound(d), ind - abs(step)), min(ind + abs(step), upperbound(d))
@@ -383,7 +376,7 @@ end
 end
 
 # TODO: replace @boundscheck and boundsError with @domaincheck and domainError?
-@propagate_inbounds function neighbors(rng::AbstractRNG, d::ContinousDistribution{T}, at::T, step::Real) where T
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::ContinousDistribution, at, step::Real)
     @boundscheck lowerbound(d) ≤ at ≤ upperbound(d) || throw(BoundsError(d, at))
     a, b = max(lowerbound(d), at - abs(step)), min(at + abs(step), upperbound(d))
     return (b - a) * rand(rng, T) + a
