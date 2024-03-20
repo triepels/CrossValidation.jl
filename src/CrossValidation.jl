@@ -236,7 +236,7 @@ struct Normal{T} <: ContinousDistribution{T}
 end
 
 function rand(rng::AbstractRNG, d::Discrete)
-    c = zero(P)
+    c = 0.0
     q = rand(rng)
     for (state, p) in zip(d.vals, d.probs)
         c += p
