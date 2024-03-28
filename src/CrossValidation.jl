@@ -254,7 +254,7 @@ rand(rng::AbstractRNG, d::SamplerTrivial{Normal{T}}) where T = T(d[].mean + d[].
 
 abstract type AbstractSpace{names, T<:Tuple} end
 
-Base.eltype(::Type{S}) where S<:AbstractSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, T.parameters)...}}
+Base.eltype(::Type{S}) where S<:AbstractSpace{names, T} where {names, T} = NamedTuple{names, Tuple{fieldtypes(T)...}}
 
 struct FiniteSpace{names, T} <: AbstractSpace{names, T}
     vars::T
