@@ -254,7 +254,7 @@ rand(rng::AbstractRNG, d::SamplerTrivial{Normal{T}}) where T = T(d[].mean + d[].
 
 abstract type AbstractSpace{names, T<:Tuple} end
 
-Base.eltype(::Type{S}) where S<:AbstractSpace{names, T} where {names, T} = NamedTuple{names, Tuple{fieldtypes(T)...}}
+Base.eltype(::Type{S}) where S<:AbstractSpace{names, T} where {names, T} = NamedTuple{names, Tuple{map(eltype, fieldtypes(T))...}}
 
 struct FiniteSpace{names, T} <: AbstractSpace{names, T}
     vars::T
@@ -350,7 +350,8 @@ end
 end
 
 @propagate_inbounds function neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at::NamedTuple{names}, step) where names
-    return NamedTuple{names}(neighbors.(rng, s.vars, values(at), step))
+    #return NamedTuple{names}(neighbors.(rng, s.vars, values(at), step))
+    return eltype(s)(map((x, a, s) -> neighbors(rng, x, a, s), s.vars, at, step))
 end
 
 # TODO: do something like @domaincheck?
