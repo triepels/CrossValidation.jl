@@ -438,7 +438,7 @@ _cast(::Type{T}, x::T, r) where T<:Real = x
 abstract type AbstractAllocation end
 
 struct GeometricAllocation <: AbstractAllocation
-    rate::Real
+    rate::Float64
     function GeometricAllocation(rate::Real)
         rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
         return new(rate)
@@ -446,7 +446,7 @@ struct GeometricAllocation <: AbstractAllocation
 end
 
 struct ContstantAllocation <: AbstractAllocation
-    rate::Real
+    rate::Float64
     function ContstantAllocation(rate::Real)
         rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
         return new(rate)
@@ -455,7 +455,7 @@ end
 
 struct HyperbandAllocation <: AbstractAllocation
     n::Int
-    rate::Real
+    rate::Float64
     function HyperbandAllocation(n::Int, rate::Real)
         n > 0 || throw(ArgumentError("unable to allocate arms over $n rounds"))
         rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
