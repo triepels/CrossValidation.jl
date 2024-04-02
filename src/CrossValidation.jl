@@ -235,10 +235,10 @@ struct Normal{T} <: ContinousDistribution{T}
     end
 end
 
-function rand(rng::AbstractRNG, d::Discrete)
+function rand(rng::AbstractRNG, d::SamplerTrivial{Discrete{T}}) where T
     c = 0.0
     q = rand(rng)
-    for (state, p) in zip(d.vals, d.probs)
+    for (state, p) in zip(d[].vals, d[].probs)
         c += p
         if q < c
             return state
@@ -247,7 +247,7 @@ function rand(rng::AbstractRNG, d::Discrete)
     return last(d.vals)
 end
 
-rand(rng::AbstractRNG, d::DiscreteUniform) = rand(rng, d.vals)
+rand(rng::AbstractRNG, d::SamplerTrivial{DiscreteUniform{T}}) where T = rand(rng, d[].vals)
 rand(rng::AbstractRNG, d::SamplerTrivial{Uniform{T}}) where T = T(d[].a + (d[].b - d[].a) * rand(rng, T))
 rand(rng::AbstractRNG, d::SamplerTrivial{LogUniform{T}}) where T = T(exp(log(d[].a) + (log(d[].b) - log(d[].a)) * rand(rng, T)))
 rand(rng::AbstractRNG, d::SamplerTrivial{Normal{T}}) where T = T(d[].mean + d[].std * randn(rng, T))
