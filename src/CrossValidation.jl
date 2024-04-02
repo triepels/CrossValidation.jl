@@ -345,13 +345,12 @@ function brutefit(f::Function, space, data::MonadicResampler; args::NamedTuple =
     return models[maximize ? argmax(loss) : argmin(loss)]
 end
 
-@propagate_inbounds function neighbors(rng::AbstractRNG, x, at, step, n::Int)
-    return [neighbors(rng, x, at, step) for _ in OneTo(n)]
+@propagate_inbounds function neighbors(rng::AbstractRNG, space::AbstractSpace, at::Tuple, step::Tuple, n::Int)
+    return [neighbors(rng, space, at, step) for _ in OneTo(n)]
 end
 
-@propagate_inbounds function neighbors(rng::AbstractRNG, s::AbstractSpace{names}, at::NamedTuple{names}, step) where names
-    #return NamedTuple{names}(neighbors.(rng, s.vars, values(at), step))
-    return eltype(s)(map((x, a, s) -> neighbors(rng, x, a, s), s.vars, at, step))
+@propagate_inbounds function neighbors(rng::AbstractRNG, space::AbstractSpace, at::Tuple, step::Tuple)
+    return eltype(space)(map((d, a, s) -> neighbors(rng, d, a, s), space.vars, at, step))
 end
 
 # TODO: do something like @domaincheck?
@@ -369,13 +368,13 @@ end
     return T((b - a) * rand(rng, T) + a)
 end
 
-function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
+function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractResampler, step::Tuple; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
 
     parm = nothing
     best = maximize ? -Inf : Inf
 
-    nb = neighbors(rng, space, rand(rng, space), step, n)
+    nb = neighbors(rng, space, values(rand(rng, space)), step, n)
     @debug "Start hill-climbing"
     @inbounds while !isempty(nb)
         loss = _val(f, nb, data, args)
@@ -387,23 +386,23 @@ function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractR
             loss[i] < best || break
         end
         parm, best = nb[i], loss[i]
-        nb = neighbors(rng, space, parm, step, n)
+        nb = neighbors(rng, space, values(parm), step, n)
     end
     @debug "Finished hill-climbing"
 
     return parm
 end
 
-hc(f::Function, space::AbstractSpace, data::AbstractResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
+hc(f::Function, space::AbstractSpace, data::AbstractResampler, step::Tuple; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
     hc(GLOBAL_RNG, f, space, data, step, args = args, n = n, maximize = maximize)
 
-function hcfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
+function hcfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::MonadicResampler, step::Tuple; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
 
     model = nothing
     best = maximize ? -Inf : Inf
   
-    nb = neighbors(rng, space, rand(rng, space), step, n)
+    nb = neighbors(rng, space, values(rand(rng, space)), step, n)
     @debug "Start hill-climbing"
     @inbounds while !isempty(nb)
         models, loss = _fit_split(f, nb, first(data)..., args)
@@ -415,14 +414,14 @@ function hcfit(rng::AbstractRNG, f::Function, space::AbstractSpace, data::Monadi
             loss[i] < best || break
         end
         model, best = models[i], loss[i]
-        nb = neighbors(rng, space, nb[i], step, n)
+        nb = neighbors(rng, space, values(nb[i]), step, n)
     end
     @debug "Finished hill-climbing"
 
     return model
 end
 
-hcfit(f::Function, space::AbstractSpace, data::MonadicResampler, step; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
+hcfit(f::Function, space::AbstractSpace, data::MonadicResampler, step::Tuple; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false) =
     hcfit(GLOBAL_RNG, f, space, data, step, args = args, n = n, maximize = maximize)
 
 struct Budget{name, T<:Real}

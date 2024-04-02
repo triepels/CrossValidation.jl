@@ -37,8 +37,8 @@ brutefit((x) -> MyModel(; x...), sp, data, args = (epochs = 100,), maximize = fa
 brute((x) -> MyModel(; x...), rand(sp, 64), data, args = (epochs = 100,), maximize = false)
 brutefit((x) -> MyModel(; x...), rand(sp, 64), data, args = (epochs = 100,), maximize = false)
 
-hc((x) -> MyModel(; x...), sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
-hcfit((x) -> MyModel(; x...), sp, data, 1, args = (epochs = 100,), n = 10, maximize = false)
+hc((x) -> MyModel(; x...), sp, data, (1, 1), args = (epochs = 100,), n = 10, maximize = false)
+hcfit((x) -> MyModel(; x...), sp, data, (1, 1), args = (epochs = 100,), n = 10, maximize = false)
 
 sha((x) -> MyModel(; x...), sp, data, Budget{:epochs}(1024), mode = GeometricAllocation(2), maximize = false)
 shafit((x) -> MyModel(; x...), sp, data, Budget{:epochs}(1024), mode = GeometricAllocation(2), maximize = false)
@@ -58,7 +58,7 @@ validate(KFold(x, 10)) do train
 end
 
 validate(KFold(x, 10)) do train
-    parm = hc((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), 1, args = (epochs = 100,), n = 10, maximize = false)
+    parm = hc((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), (1, 1), args = (epochs = 100,), n = 10, maximize = false)
     return fit!(MyModel(; parm...), train, epochs = 10)
 end
 
@@ -77,7 +77,7 @@ validate(KFold(x, 10)) do train
 end
 
 validate(KFold(x, 10)) do train
-    return hcfit((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), 1, args = (epochs = 100,), n = 10, maximize = false)
+    return hcfit((x) -> MyModel(; x...), sp, FixedSplit(train, 0.8), (1, 1), args = (epochs = 100,), n = 10, maximize = false)
 end
 
 validate(KFold(x, 10)) do train
