@@ -277,7 +277,7 @@ end
     return NamedTuple{names}(map(getindex, s.vars, I))
 end
 
-@inline function Base.getindex(s::FiniteSpace{names}, inds::Vector{Int}) where names
+@inline function Base.getindex(s::FiniteSpace{names}, inds) where names
     return [s[i] for i in inds]
 end
 
