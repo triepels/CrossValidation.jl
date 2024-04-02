@@ -371,10 +371,10 @@ end
 function hc(rng::AbstractRNG, f::Function, space::AbstractSpace, data::AbstractResampler, step::Tuple; args::NamedTuple = NamedTuple(), n::Int = 1, maximize::Bool = false)
     n ≥ 1 || throw(ArgumentError("invalid sample size of $n"))
 
-    parm = nothing
+    parm = rand(rng, space)
     best = maximize ? -Inf : Inf
 
-    nb = neighbors(rng, space, values(rand(rng, space)), step, n)
+    nb = neighbors(rng, space, values(parm), step, n)
     @debug "Start hill-climbing"
     @inbounds while !isempty(nb)
         loss = _val(f, nb, data, args)
