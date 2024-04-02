@@ -528,7 +528,7 @@ shafit(f::Function, space, data::MonadicResampler, budget::Budget; args::NamedTu
 @inline function _hyperband(rng, f, space, data, budget, args, rate, maximize)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
-    best = (nothing, nothing, maximize ? -Inf : Inf)
+    best = nothing
     n = floor(Int, log(rate, budget.val)) + 1
 
     @debug "Start hyperband"
