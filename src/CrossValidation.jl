@@ -457,7 +457,7 @@ struct HyperbandAllocation <: AbstractAllocation
     n::Int
     rate::Float64
     function HyperbandAllocation(n::Int, rate::Real)
-        n > 0 || throw(ArgumentError("unable to allocate arms over $n rounds"))
+        n > 0 || throw(ArgumentError("insufficient rounds to allocate arms"))
         rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
         return new(n, rate)
     end
@@ -531,11 +531,11 @@ shafit(f::Function, space::Union{FiniteSpace, Vector{T}}, data::MonadicResampler
     n = floor(Int, log(rate, budget.val)) + 1
 
     @debug "Start hyperband"
-    best = _sha(f, rand(rng, space, ceil(Int, rate^(n - 1))), 
+    best = _sha(f, rand(rng, space, ceil(Int, float(rate)^(n - 1))), 
                 data, budget, args, HyperbandAllocation(n, rate), maximize)
 
     @inbounds for i in reverse(OneTo(n - 1))
-        curr = _sha(f, rand(rng, space, ceil(Int, n * rate^(i - 1) / i)), 
+        curr = _sha(f, rand(rng, space, ceil(Int, n * float(rate)^(i - 1) / i)), 
                     data, budget, args, HyperbandAllocation(i, rate), maximize)
 
         if maximize
