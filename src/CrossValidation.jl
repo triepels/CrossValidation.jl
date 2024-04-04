@@ -361,16 +361,16 @@ end
 
 # TODO: do something like @domaincheck?
 @propagate_inbounds function neighbors(rng::AbstractRNG, d::Discrete, at, step::Int)
-    ind = findfirst(d.vals .== at)
+    ind = findfirst(==(at), d.vals)
     isnothing(ind) && throw(DomainError(at, "$d is undefined at $at"))
     a, b = max(1, ind - abs(step)), min(ind + abs(step), length(d))
-    vals, probs = d.vals[a:b], d.probs[a:b]
+    vals, probs = view(d.vals, a:b), view(d.probs, a:b)
     return _rand_discrete(rng, vals, probs / sum(probs))
 end
 
 # TODO: do something like @domaincheck?
 @propagate_inbounds function neighbors(rng::AbstractRNG, d::DiscreteUniform, at, step::Int)
-    ind = findfirst(d.vals .== at)
+    ind = findfirst(==(at), d.vals)
     isnothing(ind) && throw(DomainError(at, "$d is undefined at $at"))
     a, b = max(1, ind - abs(step)), min(ind + abs(step), length(d))
     return d[rand(rng, a:b)]
