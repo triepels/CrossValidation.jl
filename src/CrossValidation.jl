@@ -240,18 +240,19 @@ struct Normal{T} <: ContinousDistribution{T}
     end
 end
 
-function rand(rng::AbstractRNG, d::SamplerTrivial{Discrete{T}}) where T
+@inline function _rand_discrete(rng, vals, probs)
     c = 0.0
     q = rand(rng)
-    for (state, p) in zip(d[].vals, d[].probs)
+    for (val, p) in zip(vals, probs)
         c += p
         if q < c
-            return state
+            return val
         end
     end
-    return last(d.vals)
+    return last(vals)
 end
 
+rand(rng::AbstractRNG, d::SamplerTrivial{Discrete{T}}) where {T} = _rand_discrete(rng, d[].vals, d[].probs)
 rand(rng::AbstractRNG, d::SamplerTrivial{DiscreteUniform{T}}) where T = rand(rng, d[].vals)
 rand(rng::AbstractRNG, d::SamplerTrivial{Uniform{T}}) where T = T(d[].a + (d[].b - d[].a) * rand(rng, T))
 rand(rng::AbstractRNG, d::SamplerTrivial{LogUniform{T}}) where T = T(exp(log(d[].a) + (log(d[].b) - log(d[].a)) * rand(rng, T)))
@@ -356,6 +357,15 @@ end
 
 @propagate_inbounds function neighbors(rng::AbstractRNG, space::AbstractSpace, at::Tuple, step::Tuple)
     return eltype(space)(map((d, a, s) -> neighbors(rng, d, a, s), space.vars, at, step))
+end
+
+# TODO: do something like @domaincheck?
+@propagate_inbounds function neighbors(rng::AbstractRNG, d::Discrete, at, step::Int)
+    ind = findfirst(d.vals .== at)
+    isnothing(ind) && throw(DomainError(at, "$d is undefined at $at"))
+    a, b = max(1, ind - abs(step)), min(ind + abs(step), length(d))
+    vals, probs = d.vals[a:b], d.probs[a:b]
+    return _rand_discrete(rng, vals, probs / sum(probs))
 end
 
 # TODO: do something like @domaincheck?
