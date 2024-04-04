@@ -29,8 +29,11 @@ getobs(x, i) = x[Base.setindex(ntuple(x -> Colon(), ndims(x)), i, ndims(x))...]
 
 # TODO: is there a better solution to infer resample type?
 restype(x) = restype(typeof(x))
-restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
 restype(x::Type{T}) where T<:AbstractArray{CartesianIndex{N}, N} where N = Matrix{CartesianIndex{N}}
+restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
+restype(x::Type{T}) where T<:LinearIndices{N} where N = Array{Int64, N}
+restype(x::Type{T}) where T<:PermutedDimsArray{V, N} where {V, N} = Array{V, N}
+restype(x::Type{T}) where T<:SubArray{V, N} where {V, N} = Array{V, N}
 restype(x::Type{T}) where T = T
 
 abstract type AbstractResampler{T} end
