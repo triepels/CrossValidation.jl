@@ -325,7 +325,7 @@ function validate(f::Function, data::AbstractResampler)
     return loss
 end
 
-function brute(f::Function, space, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
+function brute(f::Function, space::Union{FiniteSpace, Vector{T}}, data::AbstractResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false) where T<:NamedTuple
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
     
     @debug "Start brute-force search"
@@ -335,7 +335,7 @@ function brute(f::Function, space, data::AbstractResampler; args::NamedTuple = N
     return space[maximize ? argmax(loss) : argmin(loss)]
 end
 
-function brutefit(f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false)
+function brutefit(f::Function, space::Union{FiniteSpace, Vector{T}}, data::MonadicResampler; args::NamedTuple = NamedTuple(), maximize::Bool = false) where T<:NamedTuple
     length(space) ≥ 1 || throw(ArgumentError("nothing to optimize"))
 
     @debug "Start brute-force search"
@@ -519,20 +519,22 @@ end
     return first(arms), first(space), first(loss)
 end
 
-sha(f::Function, space, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) =
+sha(f::Function, space::Union{FiniteSpace, Vector{T}}, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) where T<:NamedTuple =
     _sha(f, space, data, budget, args, mode, maximize)[2]
 
-shafit(f::Function, space, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) =
+shafit(f::Function, space::Union{FiniteSpace, Vector{T}}, data::MonadicResampler, budget::Budget; args::NamedTuple = NamedTuple(), mode::AbstractAllocation = GeometricAllocation(2), maximize::Bool = false) where T<:NamedTuple =
     _sha(f, space, data, budget, args, mode, maximize)[1]
 
 @inline function _hyperband(rng, f, space, data, budget, args, rate, maximize)
     rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
 
-    best = nothing
     n = floor(Int, log(rate, budget.val)) + 1
 
     @debug "Start hyperband"
-    @inbounds for i in reverse(OneTo(n))
+    best = _sha(f, rand(rng, space, ceil(Int, rate^(n - 1))), 
+                data, budget, args, HyperbandAllocation(n, rate), maximize)
+
+    @inbounds for i in reverse(OneTo(n - 1))
         curr = _sha(f, rand(rng, space, ceil(Int, n * rate^(i - 1) / i)), 
                     data, budget, args, HyperbandAllocation(i, rate), maximize)
 
@@ -590,14 +592,14 @@ hyperbandfit(f::Function, space::AbstractSpace, data::MonadicResampler, budget::
     return first(arms), first(space)
 end
 
-sasha(rng::AbstractRNG, f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+sasha(rng::AbstractRNG, f::Function, space::Union{FiniteSpace, Vector{T}}, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) where T<:NamedTuple =
     _sasha(rng, f, space, data, args, temp, maximize)[2]
-sasha(f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+sasha(f::Function, space::Union{FiniteSpace, Vector{T}}, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) where T<:NamedTuple =
     sasha(GLOBAL_RNG, f, space, data, args = args, temp = temp, maximize = maximize)
 
-sashafit(rng::AbstractRNG, f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+sashafit(rng::AbstractRNG, f::Function, space::Union{FiniteSpace, Vector{T}}, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) where T<:NamedTuple =
     _sasha(rng, f, space, data, args, temp, maximize)[1]
-sashafit(f::Function, space, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) =
+sashafit(f::Function, space::Union{FiniteSpace, Vector{T}}, data::MonadicResampler; args::NamedTuple = NamedTuple(), temp::Real = 1, maximize::Bool = false) where T<:NamedTuple =
     sashafit(GLOBAL_RNG, f, space, data, args = args, temp = temp, maximize = maximize)
 
 end
