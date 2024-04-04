@@ -457,7 +457,7 @@ struct HyperbandAllocation <: AbstractAllocation
     n::Int
     rate::Float64
     function HyperbandAllocation(n::Int, rate::Real)
-        n > 0 || throw(ArgumentError("insufficient rounds to allocate arms"))
+        n > 0 || throw(ArgumentError("unable to allocate arms over $n rounds"))
         rate > 1 || throw(ArgumentError("unable to discard arms with rate $rate"))
         return new(n, rate)
     end
