@@ -27,8 +27,10 @@ end
 getobs(x::Union{Tuple, NamedTuple}, i) = map(Base.Fix2(getobs, i), x)
 getobs(x, i) = x[Base.setindex(ntuple(x -> Colon(), ndims(x)), i, ndims(x))...]
 
+# TODO: is there a better solution to infer resample type?
 restype(x) = restype(typeof(x))
 restype(x::Type{T}) where T<:AbstractRange = Vector{eltype(x)}
+restype(x::Type{T}) where T<:AbstractArray{CartesianIndex{N}, N} where N = Matrix{CartesianIndex{N}}
 restype(x::Type{T}) where T = T
 
 abstract type AbstractResampler{T} end
