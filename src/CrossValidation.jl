@@ -598,7 +598,7 @@ hyperbandfit(f::Function, space::AbstractSpace, data::MonadicResampler, budget::
 
         @debug "Fitted arms" space prob loss
 
-        inds = findall(rand(rng, length(prob)) .≤ prob)
+        inds = findall(≥(rand(rng)), prob)
         arms, space = arms[inds], space[inds]
 
         n += 1
